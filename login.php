@@ -38,28 +38,51 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $error = 'Invalid email or password';
             }
         } else {
-            // Check if it's an employee
-            $stmt = $conn->prepare("SELECT id, first_name, last_name, email, password FROM employees WHERE email = ? AND status = 'active'");
+            // Check if it's a manager
+            $stmt = $conn->prepare("SELECT id, name, email, password, department FROM managers WHERE email = ? AND status = 'active'");
             $stmt->bind_param("s", $email);
             $stmt->execute();
             $result = $stmt->get_result();
             
             if ($result->num_rows === 1) {
-                $employee = $result->fetch_assoc();
+                $manager = $result->fetch_assoc();
                 
-                if (password_verify($password, $employee['password'])) {
-                    $_SESSION['employee_id'] = $employee['id'];
-                    $_SESSION['employee_name'] = $employee['first_name'] . ' ' . $employee['last_name'];
-                    $_SESSION['employee_email'] = $employee['email'];
-                    $_SESSION['user_type'] = 'employee';
+                if (password_verify($password, $manager['password'])) {
+                    $_SESSION['manager_id'] = $manager['id'];
+                    $_SESSION['manager_name'] = $manager['name'];
+                    $_SESSION['manager_email'] = $manager['email'];
+                    $_SESSION['manager_department'] = $manager['department'];
+                    $_SESSION['user_type'] = 'manager';
                     
-                    header('Location: employee_dashboard.php');
+                    header('Location: manager_dashboard.php');
                     exit();
                 } else {
                     $error = 'Invalid email or password';
                 }
             } else {
-                $error = 'Invalid email or password';
+                // Check if it's an employee
+                $stmt = $conn->prepare("SELECT id, first_name, last_name, email, password FROM employees WHERE email = ? AND status = 'active'");
+                $stmt->bind_param("s", $email);
+                $stmt->execute();
+                $result = $stmt->get_result();
+                
+                if ($result->num_rows === 1) {
+                    $employee = $result->fetch_assoc();
+                    
+                    if (password_verify($password, $employee['password'])) {
+                        $_SESSION['employee_id'] = $employee['id'];
+                        $_SESSION['employee_name'] = $employee['first_name'] . ' ' . $employee['last_name'];
+                        $_SESSION['employee_email'] = $employee['email'];
+                        $_SESSION['user_type'] = 'employee';
+                        
+                        header('Location: employee_dashboard.php');
+                        exit();
+                    } else {
+                        $error = 'Invalid email or password';
+                    }
+                } else {
+                    $error = 'Invalid email or password';
+                }
             }
         }
         $stmt->close();
