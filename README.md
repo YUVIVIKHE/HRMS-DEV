@@ -79,6 +79,7 @@ hrms/
 - Responsive design for all screen sizes
 - Error message display
 - Loading state on form submission
+- Support for both admin and employee logins
 
 ### Dashboard
 - Collapsible sidebar navigation
@@ -89,6 +90,36 @@ hrms/
 - Notification badge
 - Fully responsive layout
 - Smooth animations and transitions
+
+### Employee Management
+- Add individual employees with 50+ fields
+- Bulk upload via CSV file
+- Auto-generated login credentials (email as username, 8-char password)
+- Employee list with search functionality
+- Automatic shift type assignment based on location:
+  - India employees: Fixed shift, 8 hours/day required
+  - International employees: Flexible shift, 9 hours/day required
+
+### Attendance System
+- Web-based clock IN/OUT functionality
+- Real-time clock display
+- Automatic overtime calculation based on employee's required hours
+- Monthly attendance statistics:
+  - Days present
+  - Total working hours
+  - Required hours per day (based on shift type)
+  - Overtime hours
+- Attendance history table
+- Regularization request button (for late in/early out/forgot clock out)
+- Flexible shift support for international employees
+
+### Notifications
+- Messenger-style notification page
+- Create notifications with types (info/success/warning/urgent)
+- Target audience selection (all employees/specific department)
+- Dynamic notification count badge
+- Delete functionality
+- Accessible via bell icon in header
 
 ### Add Employee Page
 - Multi-step form with 5 sections:
@@ -103,6 +134,8 @@ hrms/
 - Copy address functionality
 - Fully responsive design
 - All 50+ employee fields included
+- Auto-generates employee login credentials
+- Displays password once with copy button
 
 ## Security Features
 

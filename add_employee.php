@@ -16,6 +16,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $generated_password = bin2hex(random_bytes(4)); // 8 character password
     $hashed_password = password_hash($generated_password, PASSWORD_DEFAULT);
     
+    // Determine shift type and required hours based on country
+    $country = $_POST['country'];
+    $shift_type = 'fixed';
+    $required_hours = 8.00;
+    
+    // If country is not India, set flexible shift with 9 hours
+    if (strtolower(trim($country)) !== 'india') {
+        $shift_type = 'flexible';
+        $required_hours = 9.00;
+    }
+    
     // Process form submission
     $stmt = $conn->prepare("INSERT INTO employees (
         employee_id, first_name, last_name, email, password, phone, job_title, date_of_birth, 
@@ -26,10 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         passport_expiry, passport_issue, place_of_birth, nationality, passport_no, 
         emergency_contact, blood_group, aadhar_no, perm_zip_code, perm_state, 
         perm_city, perm_address_line2, perm_address_line1, personal_email, 
-        country_code, base_location, department, user_code, employee_type
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+        country_code, base_location, department, user_code, employee_type, shift_type, required_hours
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
     
-    $stmt->bind_param("sssssssssssssssssssssssssssssssssssssssssssssssssss",
+    $stmt->bind_param("ssssssssssssssssssssssssssssssssssssssssssssssssssssd",
         $_POST['employee_id'], $_POST['first_name'], $_POST['last_name'], $_POST['email'],
         $hashed_password, $_POST['phone'], $_POST['job_title'], $_POST['date_of_birth'], $_POST['gender'],
         $_POST['marital_status'], $_POST['date_of_joining'], $_POST['date_of_confirmation'],
@@ -43,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $_POST['blood_group'], $_POST['aadhar_no'], $_POST['perm_zip_code'], $_POST['perm_state'],
         $_POST['perm_city'], $_POST['perm_address_line2'], $_POST['perm_address_line1'],
         $_POST['personal_email'], $_POST['country_code'], $_POST['base_location'],
-        $_POST['department'], $_POST['user_code'], $_POST['employee_type']
+        $_POST['department'], $_POST['user_code'], $_POST['employee_type'], $shift_type, $required_hours
     );
     
     if ($stmt->execute()) {

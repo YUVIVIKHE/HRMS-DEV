@@ -99,6 +99,58 @@ CREATE TABLE IF NOT EXISTS notifications (
     FOREIGN KEY (created_by) REFERENCES admins(id) ON DELETE CASCADE
 );
 
+-- Attendance table
+CREATE TABLE IF NOT EXISTS attendance (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    date DATE NOT NULL,
+    clock_in TIME,
+    clock_out TIME,
+    total_hours DECIMAL(5,2) DEFAULT 0,
+    overtime_hours DECIMAL(5,2) DEFAULT 0,
+    status ENUM('present', 'absent', 'half-day', 'leave') DEFAULT 'present',
+    location VARCHAR(255),
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    UNIQUE KEY unique_attendance (employee_id, date)
+);
+
+-- Attendance regularization table
+CREATE TABLE IF NOT EXISTS attendance_regularization (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    attendance_id INT NOT NULL,
+    date DATE NOT NULL,
+    type ENUM('late_in', 'early_out', 'out_of_office', 'forgot_clock_out', 'other') NOT NULL,
+    requested_clock_in TIME,
+    requested_clock_out TIME,
+    reason TEXT NOT NULL,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    approved_by INT,
+    approved_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (attendance_id) REFERENCES attendance(id) ON DELETE CASCADE,
+    FOREIGN KEY (approved_by) REFERENCES employees(id) ON DELETE SET NULL
+);
+
+-- Overtime requests table
+CREATE TABLE IF NOT EXISTS overtime_requests (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    employee_id INT NOT NULL,
+    month INT NOT NULL,
+    year INT NOT NULL,
+    total_ot_hours DECIMAL(5,2) NOT NULL,
+    status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
+    approved_by INT,
+    approved_at TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
+    FOREIGN KEY (approved_by) REFERENCES employees(id) ON DELETE SET NULL
+);
+
 -- Insert default admin (password: admin123)
 INSERT INTO admins (name, email, password) VALUES 
 ('Admin User', 'admin@hrms.com', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');

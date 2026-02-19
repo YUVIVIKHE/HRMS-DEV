@@ -31,9 +31,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
             $errors = [];
             
             while (($data = fgetcsv($handle)) !== false) {
+                // Generate random password for bulk upload
+                $generated_password = bin2hex(random_bytes(4)); // 8 character password
+                $hashed_password = password_hash($generated_password, PASSWORD_DEFAULT);
+                
+                // Determine shift type and required hours based on country (index 16)
+                $country = $data[16];
+                $shift_type = 'fixed';
+                $required_hours = 8.00;
+                
+                // If country is not India, set flexible shift with 9 hours
+                if (strtolower(trim($country)) !== 'india') {
+                    $shift_type = 'flexible';
+                    $required_hours = 9.00;
+                }
+                
                 // Map CSV columns to database fields
                 $stmt = $conn->prepare("INSERT INTO employees (
-                    employee_id, first_name, last_name, email, phone, job_title, date_of_birth, 
+                    employee_id, first_name, last_name, email, password, phone, job_title, date_of_birth, 
                     gender, marital_status, date_of_joining, date_of_confirmation, address_line1, 
                     address_line2, state, city, zip_code, country, status, account_type, ifsc_code, 
                     account_number, pan, uan_number, pf_account_number, epf, professional_tax, 
@@ -41,18 +56,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['csv_file'])) {
                     passport_expiry, passport_issue, place_of_birth, nationality, passport_no, 
                     emergency_contact, blood_group, aadhar_no, perm_zip_code, perm_state, 
                     perm_city, perm_address_line2, perm_address_line1, personal_email, 
-                    country_code, base_location, department, user_code, employee_type
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+                    country_code, base_location, department, user_code, employee_type, shift_type, required_hours
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
                 
-                // Bind parameters (50 fields)
-                $stmt->bind_param("ssssssssssssssssssssssssssssssssssssssssssssssssss",
-                    $data[0], $data[1], $data[2], $data[3], $data[4], $data[5], $data[6], $data[7],
+                // Bind parameters (52 fields: 50 from CSV + password + shift_type + required_hours)
+                $stmt->bind_param("ssssssssssssssssssssssssssssssssssssssssssssssssssssd",
+                    $data[0], $data[1], $data[2], $data[3], $hashed_password, $data[4], $data[5], $data[6], $data[7],
                     $data[8], $data[9], $data[10], $data[11], $data[12], $data[13], $data[14],
                     $data[15], $data[16], $data[17], $data[18], $data[19], $data[20], $data[21],
                     $data[22], $data[23], $data[24], $data[25], $data[26], $data[27], $data[28],
                     $data[29], $data[30], $data[31], $data[32], $data[33], $data[34], $data[35],
                     $data[36], $data[37], $data[38], $data[39], $data[40], $data[41], $data[42],
-                    $data[43], $data[44], $data[45], $data[46], $data[47], $data[48], $data[49]
+                    $data[43], $data[44], $data[45], $data[46], $data[47], $data[48], $data[49], $shift_type, $required_hours
                 );
                 
                 if ($stmt->execute()) {
