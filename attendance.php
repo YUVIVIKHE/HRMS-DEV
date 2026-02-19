@@ -7,6 +7,9 @@ if (!isset($_SESSION['employee_id']) || $_SESSION['user_type'] !== 'employee') {
     exit();
 }
 
+// Set timezone (you can make this dynamic based on employee's timezone from database)
+date_default_timezone_set('Asia/Kolkata');
+
 $employee_name = $_SESSION['employee_name'];
 $employee_id = $_SESSION['employee_id'];
 $success = '';
@@ -234,7 +237,7 @@ foreach ($attendance_records as $record) {
                 <div class="clock-section">
                     <div class="clock-card">
                         <div class="current-time" id="currentTime"></div>
-                        <div class="current-date"><?php echo date('l, F j, Y'); ?></div>
+                        <div class="current-date" id="currentDate"><?php echo date('l, F j, Y'); ?></div>
                         
                         <?php if ($today_attendance): ?>
                             <div class="attendance-status">
@@ -375,7 +378,7 @@ foreach ($attendance_records as $record) {
                                     <?php if (count($attendance_records) > 0): ?>
                                         <?php foreach ($attendance_records as $record): ?>
                                         <tr>
-                                            <td><?php echo date('M d, Y', strtotime($record['date'])); ?></td>
+                                            <td><?php echo date('D, M d, Y', strtotime($record['date'])); ?></td>
                                             <td><?php echo $record['clock_in'] ? date('h:i A', strtotime($record['clock_in'])) : '-'; ?></td>
                                             <td><?php echo $record['clock_out'] ? date('h:i A', strtotime($record['clock_out'])) : '-'; ?></td>
                                             <td><?php echo number_format($record['total_hours'], 2); ?> hrs</td>

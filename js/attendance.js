@@ -1,4 +1,4 @@
-// Update current time
+// Update current time and date
 function updateTime() {
     const now = new Date();
     const hours = String(now.getHours()).padStart(2, '0');
@@ -8,6 +8,13 @@ function updateTime() {
     const timeElement = document.getElementById('currentTime');
     if (timeElement) {
         timeElement.textContent = `${hours}:${minutes}:${seconds}`;
+    }
+    
+    // Update date as well
+    const dateElement = document.getElementById('currentDate');
+    if (dateElement) {
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        dateElement.textContent = now.toLocaleDateString('en-US', options);
     }
 }
 
