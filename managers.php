@@ -148,10 +148,10 @@ if ($result) {
                         <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"/>
                         </svg>
-                        <input type="text" id="searchInput" placeholder="Search managers..." onkeyup="searchManagers()">
+                        <input type="text" id="searchInput" class="search-input" placeholder="Search managers..." onkeyup="searchManagers()">
                     </div>
                     <div class="header-actions">
-                        <a href="add_manager.php" class="btn-add">
+                        <a href="add_manager.php" class="btn-add-employee">
                             <svg viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/>
                             </svg>
@@ -178,7 +178,12 @@ if ($result) {
                                     <?php if (count($managers) > 0): ?>
                                         <?php foreach ($managers as $manager): ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($manager['name']); ?></td>
+                                            <td>
+                                                <div class="employee-name">
+                                                    <div class="employee-avatar"><?php echo strtoupper(substr($manager['name'], 0, 1)); ?></div>
+                                                    <span><?php echo htmlspecialchars($manager['name']); ?></span>
+                                                </div>
+                                            </td>
                                             <td><?php echo htmlspecialchars($manager['email']); ?></td>
                                             <td><?php echo htmlspecialchars($manager['department'] ?? 'N/A'); ?></td>
                                             <td><?php echo htmlspecialchars($manager['phone'] ?? 'N/A'); ?></td>
@@ -192,7 +197,20 @@ if ($result) {
                                         <?php endforeach; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="6" class="no-data">No managers found</td>
+                                            <td colspan="6" class="no-data">
+                                                <div class="no-data-message">
+                                                    <svg viewBox="0 0 20 20" fill="currentColor">
+                                                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
+                                                    </svg>
+                                                    <p>No managers found</p>
+                                                    <a href="add_manager.php" class="btn-primary">
+                                                        <svg viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z"/>
+                                                        </svg>
+                                                        Add First Manager
+                                                    </a>
+                                                </div>
+                                            </td>
                                         </tr>
                                     <?php endif; ?>
                                 </tbody>
