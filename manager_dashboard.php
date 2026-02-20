@@ -30,6 +30,9 @@ $leave_stmt->bind_param("s", $manager_department);
 $leave_stmt->execute();
 $leave_count = $leave_stmt->get_result()->fetch_assoc()['count'];
 $leave_stmt->close();
+
+// OT Requests (Placeholder for now)
+$ot_count = 0;
 ?>
 <!DOCTYPE html>
 <html lang="en">
