@@ -1,6 +1,7 @@
 <?php
 session_start();
 require_once 'config.php';
+require_once 'includes/dropdown_helper.php';
 
 if (!isset($_SESSION['admin_id'])) {
     header('Location: login.php');
@@ -826,15 +827,7 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
                                             required
                                         >
                                             <option value="">Select Department</option>
-                                            <option value="IT">IT</option>
-                                            <option value="HR">HR</option>
-                                            <option value="Finance">Finance</option>
-                                            <option value="Sales">Sales</option>
-                                            <option value="Marketing">Marketing</option>
-                                            <option value="Operations">Operations</option>
-                                            <option value="Customer Support">Customer Support</option>
-                                            <option value="Product">Product</option>
-                                            <option value="Engineering">Engineering</option>
+                                            <?php echo renderDropdownOptions($conn, 'department'); ?>
                                         </select>
                                     </div>
                                     <small class="form-hint">Manager will oversee this department</small>

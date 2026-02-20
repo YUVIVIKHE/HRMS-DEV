@@ -345,6 +345,7 @@
         opacity: 0;
         transform: translateY(-20px);
     }
+
     to {
         opacity: 1;
         transform: translateY(0);
@@ -372,9 +373,10 @@
 .employees-table-container {
     background: white;
     border-radius: 12px;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
     overflow: hidden;
     animation: fadeInUp 0.5s ease-out;
+    border: 1px solid #edf2f7;
 }
 
 .employees-table {
@@ -383,22 +385,22 @@
 }
 
 .employees-table thead {
-    background: #f9fafb;
-    border-bottom: 2px solid #e5e7eb;
+    border-bottom: 2px solid #edf2f7;
 }
 
 .employees-table th {
-    padding: 16px 20px;
+    padding: 14px 20px;
     text-align: left;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
-    color: #6b7280;
+    color: #4b5563;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.05em;
+    background: #f8fafc;
 }
 
 .employees-table tbody tr {
-    border-bottom: 1px solid #e5e7eb;
+    border-bottom: 1px solid #edf2f7;
     transition: background 0.2s;
 }
 
@@ -407,9 +409,54 @@
 }
 
 .employees-table td {
-    padding: 16px 20px;
+    padding: 14px 20px;
     font-size: 14px;
-    color: #333;
+    color: #1f2937;
+    vertical-align: middle;
+}
+
+.filter-box {
+    padding: 16px 24px;
+    background: #fdfdfd;
+    border-bottom: 1px solid #edf2f7;
+    display: flex;
+    gap: 16px;
+    align-items: center;
+}
+
+.filter-select {
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    color: #4a5568;
+    background-color: white;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 160px;
+    outline: none;
+}
+
+.filter-select:hover {
+    border-color: #cbd5e0;
+    background-color: #f7fafc;
+}
+
+.filter-select:focus {
+    border-color: #0078D4;
+    box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.1);
+}
+
+.employees-table th {
+    padding: 14px 20px;
+    text-align: left;
+    font-size: 12px;
+    font-weight: 700;
+    color: #4b5563;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: #f8fafc;
 }
 
 .employee-name {
@@ -463,16 +510,16 @@
 
 .action-buttons {
     display: flex;
-    gap: 8px;
+    gap: 12px;
 }
 
 .btn-icon {
-    background: none;
-    border: none;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
     cursor: pointer;
-    padding: 6px;
-    border-radius: 6px;
-    transition: all 0.2s;
+    padding: 8px;
+    border-radius: 8px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -481,19 +528,27 @@
 .btn-icon svg {
     width: 18px;
     height: 18px;
-    color: #6b7280;
+    color: #64748b;
 }
 
 .btn-icon:hover {
-    background: #f3f4f6;
+    background: #eff6ff;
+    border-color: #3b82f6;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .btn-icon:hover svg {
-    color: #0078D4;
+    color: #2563eb;
 }
 
 .btn-delete:hover {
-    background: #fee;
+    background: #fef2f2;
+    border-color: #ef4444;
+}
+
+.btn-delete:hover svg {
+    color: #dc2626;
 }
 
 .btn-delete:hover svg {
@@ -551,44 +606,45 @@
         flex-direction: column;
         align-items: stretch;
     }
-    
+
     .header-actions {
         flex-direction: column;
     }
-    
+
     .search-box {
         max-width: 100%;
     }
-    
+
     .btn-add-employee,
     .btn-bulk-upload {
         justify-content: center;
     }
-    
+
     .bulk-upload-content {
         padding: 16px;
     }
-    
+
     .upload-instructions {
         flex-direction: column;
     }
-    
+
     .employees-table-container {
         overflow-x: auto;
     }
-    
+
     .employees-table {
         min-width: 800px;
     }
 }
 
 @media (max-width: 480px) {
+
     .employees-table th,
     .employees-table td {
         padding: 12px 10px;
         font-size: 13px;
     }
-    
+
     .employee-avatar {
         width: 32px;
         height: 32px;

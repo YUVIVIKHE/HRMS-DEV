@@ -13,6 +13,20 @@ $admin_name = $_SESSION['admin_name'];
 $count_result = $conn->query("SELECT COUNT(*) as count FROM notifications WHERE status = 'active'");
 $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
 
+// Handle delete manager
+if (isset($_GET['delete_id'])) {
+    $delete_id = $_GET['delete_id'];
+    $stmt = $conn->prepare("UPDATE managers SET status = 'inactive' WHERE id = ?");
+    $stmt->bind_param("i", $delete_id);
+    if ($stmt->execute()) {
+        header('Location: managers.php?success=Manager deleted successfully');
+        exit();
+    } else {
+        $error = "Error deleting manager: " . $conn->error;
+    }
+    $stmt->close();
+}
+
 // Fetch all managers
 $result = $conn->query("SELECT * FROM managers ORDER BY created_at DESC");
 $managers = [];
@@ -167,6 +181,24 @@ if ($result) {
             </header>
             
             <div class="content">
+                <?php if (isset($_GET['success'])): ?>
+                <div class="alert alert-success">
+                    <svg class="alert-icon" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
+                    </svg>
+                    <?php echo htmlspecialchars($_GET['success']); ?>
+                </div>
+                <?php endif; ?>
+
+                <?php if (isset($error)): ?>
+                <div class="alert alert-error">
+                    <svg class="alert-icon" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/>
+                    </svg>
+                    <?php echo $error; ?>
+                </div>
+                <?php endif; ?>
+
                 <div class="employees-header">
                     <div class="search-box">
                         <svg class="search-icon" viewBox="0 0 20 20" fill="currentColor">
@@ -196,6 +228,7 @@ if ($result) {
                                         <th>Phone</th>
                                         <th>Status</th>
                                         <th>Created</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -217,6 +250,20 @@ if ($result) {
                                                 </span>
                                             </td>
                                             <td><?php echo date('M d, Y', strtotime($manager['created_at'])); ?></td>
+                                            <td>
+                                                <div class="action-buttons">
+                                                    <a href="edit_manager.php?id=<?php echo $manager['id']; ?>" class="btn-icon" title="Edit">
+                                                        <svg viewBox="0 0 20 20" fill="currentColor">
+                                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
+                                                        </svg>
+                                                    </a>
+                                                    <a href="javascript:void(0)" onclick="confirmDelete(<?php echo $manager['id']; ?>)" class="btn-icon btn-delete" title="Delete">
+                                                        <svg viewBox="0 0 20 20" fill="currentColor">
+                                                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"/>
+                                                        </svg>
+                                                    </a>
+                                                </div>
+                                            </td>
                                         </tr>
                                         <?php endforeach; ?>
                                     <?php else: ?>
@@ -269,6 +316,12 @@ if ($result) {
                 }
                 
                 tr[i].style.display = found ? '' : 'none';
+            }
+        }
+
+        function confirmDelete(id) {
+            if (confirm('Are you sure you want to delete this manager? This action cannot be undone.')) {
+                window.location.href = 'managers.php?delete_id=' + id;
             }
         }
     </script>

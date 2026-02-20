@@ -15,7 +15,9 @@ $stats = [
     'total_employees' => 0,
     'active_employees' => 0,
     'departments' => 0,
-    'pending_leaves' => 0
+    'pending_leaves' => 0,
+    'pending_ot' => 0,
+    'total_projects' => 0
 ];
 
 $result = $conn->query("SELECT COUNT(*) as total FROM employees");
@@ -29,6 +31,12 @@ if ($result) $stats['departments'] = $result->fetch_assoc()['depts'];
 
 $result = $conn->query("SELECT COUNT(*) as pending FROM leave_requests WHERE status = 'pending'");
 if ($result) $stats['pending_leaves'] = $result->fetch_assoc()['pending'];
+
+$result = $conn->query("SELECT COUNT(*) as pending FROM overtime_requests WHERE status = 'pending'");
+if ($result) $stats['pending_ot'] = $result->fetch_assoc()['pending'];
+
+$result = $conn->query("SELECT COUNT(*) as total FROM projects");
+if ($result) $stats['total_projects'] = $result->fetch_assoc()['total'];
 
 // Get notification count
 $count_result = $conn->query("SELECT COUNT(*) as count FROM notifications WHERE status = 'active'");
@@ -230,6 +238,32 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
                             <div class="stat-value"><?php echo $stats['pending_leaves']; ?></div>
                             <div class="stat-label">Pending Leaves</div>
                             <div class="stat-change negative">Needs attention</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon orange">
+                            <svg viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value"><?php echo $stats['pending_ot']; ?></div>
+                            <div class="stat-label">Pending OT</div>
+                            <div class="stat-change negative">Needs approval</div>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon blue">
+                            <svg viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value"><?php echo $stats['total_projects']; ?></div>
+                            <div class="stat-label">Total Projects</div>
+                            <div class="stat-change positive">In progress</div>
                         </div>
                     </div>
                 </div>

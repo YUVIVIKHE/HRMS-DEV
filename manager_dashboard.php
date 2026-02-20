@@ -31,8 +31,17 @@ $leave_stmt->execute();
 $leave_count = $leave_stmt->get_result()->fetch_assoc()['count'];
 $leave_stmt->close();
 
-// OT Requests (Placeholder for now)
-$ot_count = 0;
+// Get pending OT requests count for department
+$ot_stmt = $conn->prepare("
+    SELECT COUNT(*) as count 
+    FROM overtime_requests orq 
+    JOIN employees e ON orq.employee_id = e.id 
+    WHERE orq.status = 'pending' AND e.department = ?
+");
+$ot_stmt->bind_param("s", $manager_department);
+$ot_stmt->execute();
+$ot_count = $ot_stmt->get_result()->fetch_assoc()['count'];
+$ot_stmt->close();
 ?>
 <!DOCTYPE html>
 <html lang="en">
