@@ -66,6 +66,62 @@ if ($result->num_rows > 0) {
 }
 $stmt->close();
 
+// Get Weekly Attendance Hours (Last 7 Days) for Chart
+$weekly_trend_labels = [];
+$weekly_trend_data = [];
+$today_val = date('Y-m-d');
+
+$trend_stmt = $conn->prepare("
+    SELECT 
+        d.date,
+        COALESCE(a.total_hours, 0) as hours
+    FROM (
+        SELECT CURDATE() - INTERVAL (a.a) DAY AS date
+        FROM (SELECT 0 AS a UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6) AS a
+    ) d
+    LEFT JOIN attendance a ON d.date = a.date AND a.employee_id = ? AND a.status = 'present'
+    ORDER BY d.date ASC
+");
+$trend_stmt->bind_param("i", $employee_id);
+$trend_stmt->execute();
+$trend_result = $trend_stmt->get_result();
+while ($row = $trend_result->fetch_assoc()) {
+    $weekly_trend_labels[] = date('D', strtotime($row['date']));
+    $weekly_trend_data[] = $row['hours'];
+}
+$trend_stmt->close();
+
+// Get Monthly Attendance Status for Chart
+// Days passed in month so far (excluding weekends for a rough estimate, or just total days)
+$days_in_month_so_far = (int)date('j');
+$days_present = $attendance_stats['days_present'];
+
+// Let's calculate days on leave this month
+$month_start = date('Y-m-01');
+$leave_days_this_month = 0;
+// A simplification: count days they were actually on approved leave
+$leave_stmt = $conn->prepare("
+    SELECT DATEDIFF(LEAST(end_date, CURDATE()), GREATEST(start_date, ?)) + 1 as days
+    FROM leave_requests 
+    WHERE employee_id = ? 
+    AND status = 'approved' 
+    AND start_date <= CURDATE() 
+    AND end_date >= ?
+");
+$leave_stmt->bind_param("sis", $month_start, $employee_id, $month_start);
+$leave_stmt->execute();
+$leave_res = $leave_stmt->get_result();
+while($lr = $leave_res->fetch_assoc()){
+    $leave_days_this_month += max(0, $lr['days']);
+}
+$leave_stmt->close();
+
+// Days absent is roughly days_so_far - present - leave (excluding weekends ideally, but we'll simplify)
+// To avoid negative numbers or complex weekend logic, we'll just show Present vs Leave vs Not logged (which could be weekends or absences)
+$days_not_logged = max(0, $days_in_month_so_far - $days_present - $leave_days_this_month);
+
+
+
 // Get pending leave requests
 $stmt = $conn->prepare("SELECT COUNT(*) as pending FROM leave_requests WHERE employee_id = ? AND status = 'pending'");
 $stmt->bind_param("i", $employee_id);
@@ -113,6 +169,7 @@ $assigned_projects = count($active_projects_list);
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Employee Dashboard - HRMS</title>
     <link rel="stylesheet" href="css/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         .welcome-banner {
             background: linear-gradient(135deg, #0078D4 0%, #0053A0 100%);
@@ -548,6 +605,27 @@ $assigned_projects = count($active_projects_list);
                     </div>
                 </div>
 
+                <!-- Charts Section -->
+                <div class="dashboard-grid" style="margin-top: 24px;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">My Weekly Attendance Hours</h3>
+                        </div>
+                        <div class="card-body" style="height: 300px; display: flex; align-items: center; justify-content: center;">
+                            <canvas id="weeklyAttendanceChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Monthly Attendance Status (Days)</h3>
+                        </div>
+                        <div class="card-body" style="height: 300px; display: flex; align-items: center; justify-content: center;">
+                            <canvas id="monthlyAttendanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Quick Actions -->
                 <div class="card" style="margin-top: 24px;">
                     <div class="card-header">
@@ -596,5 +674,101 @@ $assigned_projects = count($active_projects_list);
     </div>
     
     <script src="js/dashboard.js"></script>
+    <script>
+        // Data for Weekly Attendance Hours
+        const weeklyLabels = <?php echo json_encode($weekly_trend_labels); ?>;
+        const weeklyData = <?php echo json_encode($weekly_trend_data); ?>;
+        
+        const ctxWeekly = document.getElementById('weeklyAttendanceChart').getContext('2d');
+        new Chart(ctxWeekly, {
+            type: 'line',
+            data: {
+                labels: weeklyLabels,
+                datasets: [{
+                    label: 'Hours Worked',
+                    data: weeklyData,
+                    borderColor: '#ff9800',
+                    backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#ff9800',
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 2
+                        },
+                        grid: {
+                            color: '#f3f4f6'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Data for Monthly Attendance Status
+        const monthlyData = [
+            <?php echo $days_present; ?>, 
+            <?php echo $leave_days_this_month; ?>, 
+            <?php echo $days_not_logged; ?>
+        ];
+        
+        const ctxMonthly = document.getElementById('monthlyAttendanceChart').getContext('2d');
+        new Chart(ctxMonthly, {
+            type: 'doughnut',
+            data: {
+                labels: ['Days Present', 'Days on Leave', 'Unlogged/Absent/Weekends'],
+                datasets: [{
+                    data: monthlyData,
+                    backgroundColor: [
+                        '#10b981', // green for present
+                        '#8b5cf6', // purple for leave
+                        '#d1d5db'  // gray for unlogged/weekends
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>

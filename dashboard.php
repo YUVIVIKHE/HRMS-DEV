@@ -41,6 +41,54 @@ if ($result) $stats['total_projects'] = $result->fetch_assoc()['total'];
 // Get notification count
 $count_result = $conn->query("SELECT COUNT(*) as count FROM notifications WHERE status = 'active'");
 $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
+
+// Get Weekly Attendance Trend (Last 7 Days) for Chart
+$weekly_trend_labels = [];
+$weekly_trend_data = [];
+$today_val = date('Y-m-d');
+
+$trend_stmt = $conn->prepare("
+    SELECT 
+        d.date,
+        COUNT(a.id) as present_count
+    FROM (
+        SELECT CURDATE() - INTERVAL (a.a) DAY AS date
+        FROM (SELECT 0 AS a UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6) AS a
+    ) d
+    LEFT JOIN attendance a ON d.date = a.date AND a.status = 'present'
+    GROUP BY d.date
+    ORDER BY d.date ASC
+");
+$trend_stmt->execute();
+$trend_result = $trend_stmt->get_result();
+while ($row = $trend_result->fetch_assoc()) {
+    $weekly_trend_labels[] = date('D', strtotime($row['date']));
+    $weekly_trend_data[] = $row['present_count'];
+}
+$trend_stmt->close();
+
+// Get Today's Attendance Breakdown for Chart
+$today = date('Y-m-d');
+$presence_stmt = $conn->prepare("
+    SELECT 
+        COUNT(CASE WHEN a.status = 'present' OR a.status = 'half-day' THEN 1 END) as present,
+        COUNT(CASE WHEN lr.id IS NOT NULL THEN 1 END) as on_leave
+    FROM employees e
+    LEFT JOIN attendance a ON e.id = a.employee_id AND a.date = ?
+    LEFT JOIN leave_requests lr ON e.id = lr.employee_id 
+        AND lr.status = 'approved' 
+        AND ? BETWEEN lr.start_date AND lr.end_date
+    WHERE e.status = 'active'
+");
+$presence_stmt->bind_param("ss", $today, $today);
+$presence_stmt->execute();
+$presence_result = $presence_stmt->get_result()->fetch_assoc();
+$total_active = $stats['active_employees'];
+$team_present = $presence_result['present'];
+$team_on_leave = $presence_result['on_leave'];
+$team_absent_not_clocked = max(0, $total_active - $team_present - $team_on_leave);
+$presence_stmt->close();
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -49,6 +97,7 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HRMS Dashboard</title>
     <link rel="stylesheet" href="css/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="dashboard-container">
@@ -278,6 +327,26 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
                     </a>
                 </div>
                 
+                <div class="dashboard-grid" style="margin-bottom: 24px;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Company-Wide Weekly Attendance Trend</h3>
+                        </div>
+                        <div class="card-body" style="height: 300px; display: flex; align-items: center; justify-content: center;">
+                            <canvas id="weeklyAttendanceChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Today's Attendance Breakdown</h3>
+                        </div>
+                        <div class="card-body" style="height: 300px; display: flex; align-items: center; justify-content: center;">
+                            <canvas id="todayAttendanceChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="dashboard-grid">
                     <div class="card">
                         <div class="card-header">
@@ -364,5 +433,115 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
     </div>
     
     <script src="js/dashboard.js"></script>
+    <script>
+        // Data for Weekly Attendance Trend
+        const weeklyLabels = <?php echo json_encode($weekly_trend_labels); ?>;
+        const weeklyData = <?php echo json_encode($weekly_trend_data); ?>;
+        
+        const ctxWeekly = document.getElementById('weeklyAttendanceChart').getContext('2d');
+        new Chart(ctxWeekly, {
+            type: 'line',
+            data: {
+                labels: weeklyLabels,
+                datasets: [{
+                    label: 'Employees Present',
+                    data: weeklyData,
+                    borderColor: '#0078D4',
+                    backgroundColor: 'rgba(0, 120, 212, 0.1)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.4,
+                    pointBackgroundColor: '#0078D4',
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        },
+                        grid: {
+                            color: '#f3f4f6'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Data for Today's Attendance Breakdown
+        const todayData = [
+            <?php echo $team_present; ?>, 
+            <?php echo $team_on_leave; ?>, 
+            <?php echo $team_absent_not_clocked; ?>
+        ];
+        
+        const ctxToday = document.getElementById('todayAttendanceChart').getContext('2d');
+        new Chart(ctxToday, {
+            type: 'doughnut',
+            data: {
+                labels: ['Present', 'On Leave', 'Absent / Not Clocked In'],
+                datasets: [{
+                    data: todayData,
+                    backgroundColor: [
+                        '#10b981', // green for present
+                        '#8b5cf6', // purple for leave
+                        '#ef4444'  // red for absent
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed !== null) {
+                                    label += context.parsed;
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>

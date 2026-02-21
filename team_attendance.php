@@ -2,14 +2,25 @@
 session_start();
 require_once 'config.php';
 
-if (!isset($_SESSION['manager_id']) || $_SESSION['user_type'] !== 'manager') {
+if (!isset($_SESSION['admin_id']) && !isset($_SESSION['manager_id'])) {
+    header('Location: login.php');
+    exit();
+}
+if ($_SESSION['user_type'] === 'employee') {
     header('Location: login.php');
     exit();
 }
 
-$manager_name = $_SESSION['manager_name'];
-$manager_department = $_SESSION['manager_department'];
 $user_type = $_SESSION['user_type'];
+$is_admin = ($user_type === 'admin');
+
+if ($is_admin) {
+    $manager_name = $_SESSION['admin_name'] ?? 'Administrator';
+    $manager_department = 'All Departments';
+} else {
+    $manager_name = $_SESSION['manager_name'];
+    $manager_department = $_SESSION['manager_department'];
+}
 
 // Date range filters
 $start_date = isset($_GET['start_date']) ? $_GET['start_date'] : date('Y-m-d', strtotime('-30 days'));
@@ -17,19 +28,28 @@ $end_date = isset($_GET['end_date']) ? $_GET['end_date'] : date('Y-m-d');
 $search_emp = isset($_GET['employee_id']) ? $_GET['employee_id'] : '';
 
 // Fetch team members for filter
-$emp_stmt = $conn->prepare("SELECT id, first_name, last_name FROM employees WHERE department = ? ORDER BY first_name ASC");
-$emp_stmt->bind_param("s", $manager_department);
-$emp_stmt->execute();
+if ($is_admin) {
+    $emp_stmt = $conn->prepare("SELECT id, first_name, last_name, department FROM employees ORDER BY first_name ASC");
+    $emp_stmt->execute();
+} else {
+    $emp_stmt = $conn->prepare("SELECT id, first_name, last_name, department FROM employees WHERE department = ? ORDER BY first_name ASC");
+    $emp_stmt->bind_param("s", $manager_department);
+    $emp_stmt->execute();
+}
 $team_members = $emp_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $emp_stmt->close();
 
 // Fetch attendance records
 $query = "
-    SELECT a.*, e.first_name, e.last_name, e.employee_id as emp_code
+    SELECT a.*, e.first_name, e.last_name, e.employee_id as emp_code, e.department
     FROM attendance a
     JOIN employees e ON a.employee_id = e.id
-    WHERE e.department = ? AND a.date BETWEEN ? AND ?
+    WHERE a.date BETWEEN ? AND ?
 ";
+
+if (!$is_admin) {
+    $query .= " AND e.department = ?";
+}
 
 if (!empty($search_emp)) {
     $query .= " AND e.id = " . intval($search_emp);
@@ -38,7 +58,11 @@ if (!empty($search_emp)) {
 $query .= " ORDER BY a.date DESC, a.clock_in DESC";
 
 $stmt = $conn->prepare($query);
-$stmt->bind_param("sss", $manager_department, $start_date, $end_date);
+if (!$is_admin) {
+    $stmt->bind_param("sss", $start_date, $end_date, $manager_department);
+} else {
+    $stmt->bind_param("ss", $start_date, $end_date);
+}
 $stmt->execute();
 $attendance_records = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 $stmt->close();

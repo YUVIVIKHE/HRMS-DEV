@@ -44,6 +44,8 @@ $ot_count = $ot_stmt->get_result()->fetch_assoc()['count'];
 $ot_stmt->close();
 
 // Get Weekly Attendance Trend (Last 7 Days)
+$weekly_trend_labels = [];
+$weekly_trend_data = [];
 $trend_data = [];
 $today_val = date('Y-m-d');
 $week_ago = date('Y-m-d', strtotime('-6 days'));
@@ -57,7 +59,7 @@ $trend_stmt = $conn->prepare("
     ) d
     LEFT JOIN attendance a ON d.date = a.date AND a.employee_id IN (
         SELECT id FROM employees WHERE department = ? AND status = 'active'
-    )
+    ) AND a.status = 'present'
     GROUP BY d.date
     ORDER BY d.date ASC
 ");
@@ -66,6 +68,8 @@ $trend_stmt->execute();
 $trend_result = $trend_stmt->get_result();
 while ($row = $trend_result->fetch_assoc()) {
     $trend_data[] = $row;
+    $weekly_trend_labels[] = date('D', strtotime($row['date']));
+    $weekly_trend_data[] = $row['present_count'];
 }
 $trend_stmt->close();
 
@@ -89,7 +93,7 @@ $proj_stmt->close();
 $today = date('Y-m-d');
 $presence_stmt = $conn->prepare("
     SELECT 
-        COUNT(CASE WHEN a.status = 'present' THEN 1 END) as present,
+        COUNT(CASE WHEN a.status = 'present' OR a.status = 'half-day' THEN 1 END) as present,
         COUNT(CASE WHEN lr.id IS NOT NULL THEN 1 END) as on_leave
     FROM employees e
     LEFT JOIN attendance a ON e.id = a.employee_id AND a.date = ?
@@ -103,6 +107,7 @@ $presence_stmt->execute();
 $presence_result = $presence_stmt->get_result()->fetch_assoc();
 $team_present = $presence_result['present'];
 $team_on_leave = $presence_result['on_leave'];
+$team_absent_not_clocked = max(0, $dept_employee_count - $team_present - $team_on_leave);
 $presence_stmt->close();
 
 // Get Recent Team Activity
@@ -132,6 +137,7 @@ $activity_stmt->close();
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manager Dashboard - HRMS</title>
     <link rel="stylesheet" href="css/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="dashboard-container">
@@ -324,27 +330,22 @@ $activity_stmt->close();
                     </a>
                 </div>
 
-                <div class="stats-grid" style="grid-template-columns: 1fr; margin-bottom: 24px;">
-                    <div class="card" style="padding: 20px;">
-                        <h3 class="card-title" style="margin-bottom: 16px;">Weekly Attendance Trend</h3>
-                        <div style="display: flex; align-items: flex-end; gap: 12px; height: 150px; padding-top: 20px;">
-                            <?php 
-                            $max_present = 0;
-                            foreach($trend_data as $day) if($day['present_count'] > $max_present) $max_present = $day['present_count'];
-                            if($max_present == 0) $max_present = 1;
-                            
-                            foreach($trend_data as $day): 
-                                $height = ($day['present_count'] / $max_present) * 100;
-                                $is_today_trend = ($day['date'] == $today_val);
-                            ?>
-                            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;">
-                                <div style="width: 100%; position: relative; height: 100px; background: #f3f4f6; border-radius: 4px; overflow: hidden;">
-                                    <div style="position: absolute; bottom: 0; width: 100%; height: <?php echo $height; ?>%; background: <?php echo $is_today_trend ? '#0078D4' : '#93c5fd'; ?>; transition: height 0.3s ease;"></div>
-                                </div>
-                                <div style="font-size: 10px; color: #6b7280;"><?php echo date('D', strtotime($day['date'])); ?></div>
-                                <div style="font-size: 11px; font-weight: 600;"><?php echo $day['present_count']; ?></div>
-                            </div>
-                            <?php endforeach; ?>
+                <div class="dashboard-grid" style="margin-bottom: 24px;">
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Team Weekly Attendance Trend</h3>
+                        </div>
+                        <div class="card-body" style="height: 300px; display: flex; align-items: center; justify-content: center;">
+                            <canvas id="weeklyAttendanceChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Today's Team Attendance Breakdown</h3>
+                        </div>
+                        <div class="card-body" style="height: 300px; display: flex; align-items: center; justify-content: center;">
+                            <canvas id="todayAttendanceChart"></canvas>
                         </div>
                     </div>
                 </div>
@@ -468,5 +469,91 @@ $activity_stmt->close();
     </div>
     
     <script src="js/dashboard.js"></script>
+    <script>
+        // Data for Weekly Attendance Trend
+        const weeklyLabels = <?php echo json_encode($weekly_trend_labels); ?>;
+        const weeklyData = <?php echo json_encode($weekly_trend_data); ?>;
+        
+        const ctxWeekly = document.getElementById('weeklyAttendanceChart').getContext('2d');
+        new Chart(ctxWeekly, {
+            type: 'bar',
+            data: {
+                labels: weeklyLabels,
+                datasets: [{
+                    label: 'Team Members Present',
+                    data: weeklyData,
+                    backgroundColor: '#0078D4',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1
+                        },
+                        grid: {
+                            color: '#f3f4f6'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        }
+                    }
+                }
+            }
+        });
+
+        // Data for Today's Team Attendance Breakdown
+        const todayData = [
+            <?php echo $team_present; ?>, 
+            <?php echo $team_on_leave; ?>, 
+            <?php echo $team_absent_not_clocked; ?>
+        ];
+        
+        const ctxToday = document.getElementById('todayAttendanceChart').getContext('2d');
+        new Chart(ctxToday, {
+            type: 'doughnut',
+            data: {
+                labels: ['Present', 'On Leave', 'Absent / Not Clocked In'],
+                datasets: [{
+                    data: todayData,
+                    backgroundColor: [
+                        '#10b981', // green for present
+                        '#8b5cf6', // purple for leave
+                        '#ef4444'  // red for absent
+                    ],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>
