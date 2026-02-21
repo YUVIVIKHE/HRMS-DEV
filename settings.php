@@ -67,8 +67,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
     } elseif ($user_type === 'employee') {
         $phone = trim($_POST['phone']);
         $personal_email = trim($_POST['personal_email']);
-        $stmt = $conn->prepare("UPDATE employees SET phone = ?, personal_email = ? WHERE id = ?");
-        $stmt->bind_param("ssi", $phone, $personal_email, $viewer_id);
+        $address_line1 = trim($_POST['address_line1']);
+        $city = trim($_POST['city']);
+        $state = trim($_POST['state']);
+        $zip_code = trim($_POST['zip_code']);
+        
+        $stmt = $conn->prepare("UPDATE employees SET phone = ?, personal_email = ?, address_line1 = ?, city = ?, state = ?, zip_code = ? WHERE id = ?");
+        $stmt->bind_param("ssssssi", $phone, $personal_email, $address_line1, $city, $state, $zip_code, $viewer_id);
         if ($stmt->execute()) {
             $success = "Profile updated successfully!";
         } else {
@@ -89,7 +94,7 @@ if ($user_type === 'admin') {
     $stmt->execute();
     $current_data = $stmt->get_result()->fetch_assoc();
 } else {
-    $stmt = $conn->prepare("SELECT first_name, last_name, email, phone, personal_email FROM employees WHERE id = ?");
+    $stmt = $conn->prepare("SELECT first_name, last_name, email, phone, personal_email, address_line1, city, state, zip_code FROM employees WHERE id = ?");
     $stmt->bind_param("i", $viewer_id);
     $stmt->execute();
     $current_data = $stmt->get_result()->fetch_assoc();
@@ -157,7 +162,7 @@ if ($user_type === 'admin') {
                         </svg>
                         <span class="nav-text">Dashboard</span>
                     </a>
-                    <a href="employees.php" class="nav-item <?php echo in_array($current_page, ['employees.php', 'add_employee.php', 'edit_employee.php', 'employee_profile.php']) ? 'active' : ''; ?>">
+                    <a href="employees.php" class="nav-item <?php echo in_array($current_page, ['employees.php', 'add_employee.php', 'edit_employee.php']) ? 'active' : ''; ?>">
                         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
                         </svg>
@@ -339,6 +344,15 @@ if ($user_type === 'admin') {
                                     <label class="form-label">Full Name</label>
                                     <input type="text" name="name" class="form-input" value="<?php echo htmlspecialchars($current_data['name']); ?>" required>
                                 </div>
+                                <?php elseif ($user_type === 'employee'): ?>
+                                <div class="form-group">
+                                    <label class="form-label">First Name</label>
+                                    <input type="text" class="form-input" value="<?php echo htmlspecialchars($current_data['first_name']); ?>" disabled style="background-color: #f3f4f6; color: #6b7280; cursor: not-allowed;">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Last Name</label>
+                                    <input type="text" class="form-input" value="<?php echo htmlspecialchars($current_data['last_name']); ?>" disabled style="background-color: #f3f4f6; color: #6b7280; cursor: not-allowed;">
+                                </div>
                                 <?php endif; ?>
                                 <div class="form-group">
                                     <label class="form-label">Phone Number</label>
@@ -347,7 +361,23 @@ if ($user_type === 'admin') {
                                 <?php if ($user_type === 'employee'): ?>
                                 <div class="form-group">
                                     <label class="form-label">Personal Email</label>
-                                    <input type="email" name="personal_email" class="form-input" value="<?php echo htmlspecialchars($current_data['personal_email']); ?>">
+                                    <input type="email" name="personal_email" class="form-input" value="<?php echo htmlspecialchars($current_data['personal_email'] ?? ''); ?>">
+                                </div>
+                                <div class="form-group" style="grid-column: 1 / -1;">
+                                    <label class="form-label">Address</label>
+                                    <input type="text" name="address_line1" class="form-input" value="<?php echo htmlspecialchars($current_data['address_line1'] ?? ''); ?>">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">City</label>
+                                    <input type="text" name="city" class="form-input" value="<?php echo htmlspecialchars($current_data['city'] ?? ''); ?>">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">State</label>
+                                    <input type="text" name="state" class="form-input" value="<?php echo htmlspecialchars($current_data['state'] ?? ''); ?>">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">ZIP Code</label>
+                                    <input type="text" name="zip_code" class="form-input" value="<?php echo htmlspecialchars($current_data['zip_code'] ?? ''); ?>">
                                 </div>
                                 <?php endif; ?>
                             </div>

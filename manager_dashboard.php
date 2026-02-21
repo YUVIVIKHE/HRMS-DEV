@@ -353,7 +353,8 @@ $activity_stmt->close();
                 <div class="dashboard-grid">
                     <div class="card">
                         <div class="card-header">
-                            <h3 class="card-title">Recent Team Activity</h3>
+                            <h3 class="card-title">Recent Activities</h3>
+                            <button class="btn-text">View All</button>
                         </div>
                         <div class="card-body">
                             <div class="activity-list">
@@ -427,37 +428,34 @@ $activity_stmt->close();
                         </div>
                         <div class="card-body">
                             <div class="quick-actions">
-                                <a href="manage_overtime.php" class="action-btn" style="position: relative;">
+                                <a href="team_list.php" class="action-btn">
                                     <svg viewBox="0 0 20 20" fill="currentColor">
-                                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
+                                        <path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/>
                                     </svg>
-                                    Approve OT
-                                    <?php if ($ot_count > 0): ?>
-                                        <span style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white;"><?php echo $ot_count; ?></span>
-                                    <?php endif; ?>
+                                    <span>Team Members</span>
                                 </a>
-                                <a href="manage_leaves.php" class="action-btn" style="position: relative;">
+                                <a href="team_attendance.php" class="action-btn">
                                     <svg viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/>
                                     </svg>
-                                    Approve Leaves
+                                    <span>Team Attendance</span>
+                                </a>
+                                <a href="manage_leaves.php" class="action-btn" style="position: relative;">
+                                    <svg viewBox="0 0 20 20" fill="currentColor">
+                                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                                    </svg>
+                                    <span>Approve Leaves</span>
                                     <?php if ($leave_count > 0): ?>
                                         <span style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white;"><?php echo $leave_count; ?></span>
                                     <?php endif; ?>
                                 </a>
-                                <a href="team_attendance.php" class="action-btn">
+                                <a href="manage_overtime.php" class="action-btn" style="position: relative;">
                                     <svg viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
+                                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
                                     </svg>
-                                    Team Attendance
-                                </a>
-                                <a href="projects.php" class="action-btn" style="position: relative;">
-                                    <svg viewBox="0 0 20 20" fill="currentColor">
-                                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                                    </svg>
-                                    Project Details
-                                    <?php if (count($active_projects) > 0): ?>
-                                        <span style="position: absolute; top: -5px; right: -5px; background: #0078D4; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white;"><?php echo count($active_projects); ?></span>
+                                    <span>Approve OT</span>
+                                    <?php if ($ot_count > 0): ?>
+                                        <span style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white;"><?php echo $ot_count; ?></span>
                                     <?php endif; ?>
                                 </a>
                             </div>

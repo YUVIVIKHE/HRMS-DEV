@@ -20,8 +20,8 @@ $viewer_id = $_SESSION['admin_id'] ?? $_SESSION['manager_id'] ?? $_SESSION['empl
 $success = '';
 $error = '';
 
-// Handle Delete
-if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
+// Handle Delete (Admin Only)
+if ($user_type === 'admin' && isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $holiday_id = intval($_GET['delete']);
     $stmt = $conn->prepare("DELETE FROM holidays WHERE id = ?");
     $stmt->bind_param("i", $holiday_id);
@@ -34,8 +34,8 @@ if (isset($_GET['delete']) && is_numeric($_GET['delete'])) {
     $stmt->close();
 }
 
-// Handle Add/Edit
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Handle Add/Edit (Admin Only)
+if ($user_type === 'admin' && $_SERVER['REQUEST_METHOD'] === 'POST') {
     $holiday_id = $_POST['holiday_id'] ?? null;
     $holiday_date = $_POST['holiday_date'];
     $holiday_name = $_POST['holiday_name'];
@@ -199,7 +199,7 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
                         </svg>
                         <span class="nav-text">Dashboard</span>
                     </a>
-                    <a href="employees.php" class="nav-item <?php echo in_array($current_page, ['employees.php', 'add_employee.php', 'edit_employee.php', 'employee_profile.php']) ? 'active' : ''; ?>">
+                    <a href="employees.php" class="nav-item <?php echo in_array($current_page, ['employees.php', 'add_employee.php', 'edit_employee.php']) ? 'active' : ''; ?>">
                         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
                         </svg>
@@ -440,7 +440,9 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
                                         <th>Day</th>
                                         <th>Holiday Name</th>
                                         <th>Type</th>
+                                        <?php if ($user_type === 'admin'): ?>
                                         <th>Actions</th>
+                                        <?php endif; ?>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -475,10 +477,12 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
                                         <?php endforeach; ?>
                                     <?php else: ?>
                                         <tr>
-                                            <td colspan="5" class="no-data">
+                                            <td colspan="<?php echo ($user_type === 'admin') ? '5' : '4'; ?>" class="no-data">
                                                 <div class="no-data-message">
                                                     <p>No holidays found for <?php echo $year_filter; ?></p>
+                                                    <?php if ($user_type === 'admin'): ?>
                                                     <button class="btn-primary" onclick="openAddModal()">Add First Holiday</button>
+                                                    <?php endif; ?>
                                                 </div>
                                             </td>
                                         </tr>

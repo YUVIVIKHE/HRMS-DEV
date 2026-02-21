@@ -130,6 +130,24 @@ $result = $stmt->get_result();
 $pending_leaves = $result->fetch_assoc()['pending'] ?? 0;
 $stmt->close();
 
+// Get Recent Activity for Employee
+$recent_activities = [];
+$activity_stmt = $conn->prepare("
+    (SELECT 'attendance' as type, date as ref_date, clock_in as time, 'clocked in' as action 
+     FROM attendance WHERE employee_id = ? ORDER BY clock_in DESC LIMIT 5)
+    UNION
+    (SELECT 'leave' as type, start_date as ref_date, created_at as time, CONCAT('requested leave (', status, ')') as action 
+     FROM leave_requests WHERE employee_id = ? ORDER BY created_at DESC LIMIT 5)
+    ORDER BY time DESC LIMIT 8
+");
+$activity_stmt->bind_param("ii", $employee_id, $employee_id);
+$activity_stmt->execute();
+$activity_result = $activity_stmt->get_result();
+while($row = $activity_result->fetch_assoc()) {
+    $recent_activities[] = $row;
+}
+$activity_stmt->close();
+
 // Get upcoming holidays (next 3)
 $upcoming_holidays = [];
 $result = $conn->query("
@@ -469,7 +487,7 @@ $assigned_projects = count($active_projects_list);
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
                                     <strong>Today's Attendance:</strong>
-                                    <?php if ($today_attendance['clock_out_time']): ?>
+                                    <?php if ($today_attendance['clock_out']): ?>
                                         <span class="attendance-status-badge completed">
                                             ✓ Completed
                                         </span>
@@ -480,9 +498,9 @@ $assigned_projects = count($active_projects_list);
                                     <?php endif; ?>
                                 </div>
                                 <div style="text-align: right; font-size: 14px; color: #6b7280;">
-                                    <div>Clock In: <strong><?php echo date('g:i A', strtotime($today_attendance['clock_in_time'])); ?></strong></div>
-                                    <?php if ($today_attendance['clock_out_time']): ?>
-                                        <div>Clock Out: <strong><?php echo date('g:i A', strtotime($today_attendance['clock_out_time'])); ?></strong></div>
+                                    <div>Clock In: <strong><?php echo date('g:i A', strtotime($today_attendance['clock_in'])); ?></strong></div>
+                                    <?php if ($today_attendance['clock_out']): ?>
+                                        <div>Clock Out: <strong><?php echo date('g:i A', strtotime($today_attendance['clock_out'])); ?></strong></div>
                                         <div>Total: <strong><?php echo number_format($today_attendance['total_hours'], 2); ?> hours</strong></div>
                                     <?php endif; ?>
                                 </div>
@@ -535,11 +553,11 @@ $assigned_projects = count($active_projects_list);
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Designation</span>
-                                <span class="info-value"><?php echo htmlspecialchars($employee['designation'] ?? $employee['job_title'] ?? 'N/A'); ?></span>
+                                <span class="info-value"><?php echo htmlspecialchars($employee['job_title'] ?? 'N/A'); ?></span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Employment Type</span>
-                                <span class="info-value"><?php echo htmlspecialchars($employee['employment_type'] ?? 'N/A'); ?></span>
+                                <span class="info-value"><?php echo htmlspecialchars($employee['employee_type'] ?? 'N/A'); ?></span>
                             </div>
                             <div class="info-row">
                                 <span class="info-label">Date of Joining</span>
@@ -626,46 +644,89 @@ $assigned_projects = count($active_projects_list);
                     </div>
                 </div>
 
-                <!-- Quick Actions -->
-                <div class="card" style="margin-top: 24px;">
-                    <div class="card-header">
-                        <h3 class="card-title">Quick Actions</h3>
+                <!-- Recent Activities & Quick Actions -->
+                <div class="dashboard-grid" style="margin-top: 24px;">
+                    <!-- My Recent Activity -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">My Recent Activity</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="activity-list">
+                                <?php if (empty($recent_activities)): ?>
+                                    <div class="no-data" style="padding: 20px; text-align: center; color: #666;">
+                                        No recent activity to show.
+                                    </div>
+                                <?php else: ?>
+                                    <?php foreach ($recent_activities as $activity): ?>
+                                        <div class="activity-item">
+                                            <div class="activity-icon <?php echo ($activity['type'] == 'attendance' ? 'blue' : 'orange'); ?>">
+                                                <svg viewBox="0 0 20 20" fill="currentColor">
+                                                    <?php if ($activity['type'] == 'attendance'): ?>
+                                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
+                                                    <?php else: ?>
+                                                        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/>
+                                                    <?php endif; ?>
+                                                </svg>
+                                            </div>
+                                            <div class="activity-content">
+                                                <div class="activity-title">
+                                                    <strong>You</strong> 
+                                                    <?php echo htmlspecialchars($activity['action']); ?>
+                                                </div>
+                                                <div class="activity-time"><?php echo date('M d, g:i A', strtotime($activity['time'])); ?></div>
+                                            </div>
+                                        </div>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+                        </div>
                     </div>
-                    <div class="card-body">
-                        <div class="quick-action-grid">
-                            <a href="attendance.php" class="quick-action-btn">
-                                <div class="quick-action-icon">
-                                    <svg viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
-                                    </svg>
-                                </div>
-                                <span class="quick-action-text">Clock In/Out</span>
-                            </a>
-                            <a href="attendance.php" class="quick-action-btn">
-                                <div class="quick-action-icon">
-                                    <svg viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/>
-                                    </svg>
-                                </div>
-                                <span class="quick-action-text">View Attendance</span>
-                            </a>
-                            <a href="leave_requests.php" class="quick-action-btn">
-                                <div class="quick-action-icon">
-                                    <svg viewBox="0 0 20 20" fill="currentColor">
-                                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
-                                        <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z"/>
-                                    </svg>
-                                </div>
-                                <span class="quick-action-text">Request Leave</span>
-                            </a>
-                            <a href="profile.php" class="quick-action-btn">
-                                <div class="quick-action-icon">
-                                    <svg viewBox="0 0 20 20" fill="currentColor">
-                                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
-                                    </svg>
-                                </div>
-                                <span class="quick-action-text">View Profile</span>
-                            </a>
+
+                    <!-- Quick Actions -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">Quick Actions</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="quick-action-grid">
+                                <a href="attendance.php" class="quick-action-btn">
+                                    <div class="quick-action-icon">
+                                        <svg viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
+                                        </svg>
+                                    </div>
+                                    <span class="quick-action-text">Clock In/Out</span>
+                                </a>
+                                <a href="attendance.php" class="quick-action-btn">
+                                    <div class="quick-action-icon">
+                                        <svg viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/>
+                                        </svg>
+                                    </div>
+                                    <span class="quick-action-text">View Attendance</span>
+                                </a>
+                                <a href="leave_requests.php" class="quick-action-btn" style="position: relative;">
+                                    <div class="quick-action-icon">
+                                        <svg viewBox="0 0 20 20" fill="currentColor">
+                                            <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                                            <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z"/>
+                                        </svg>
+                                    </div>
+                                    <span class="quick-action-text">Request Leave</span>
+                                    <?php if ($pending_leaves > 0): ?>
+                                        <span style="position: absolute; top: 10px; right: 10px; background: #ef4444; color: white; border-radius: 50%; width: 22px; height: 22px; font-size: 12px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white;"><?php echo $pending_leaves; ?></span>
+                                    <?php endif; ?>
+                                </a>
+                                <a href="profile.php" class="quick-action-btn">
+                                    <div class="quick-action-icon">
+                                        <svg viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
+                                        </svg>
+                                    </div>
+                                    <span class="quick-action-text">View Profile</span>
+                                </a>
+                            </div>
                         </div>
                     </div>
                 </div>

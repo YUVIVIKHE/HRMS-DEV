@@ -18,23 +18,33 @@ $viewer_id = $_SESSION[$user_type . '_id'];
 $viewer_name = $_SESSION[$user_type . '_name'];
 
 $user_data = null;
+$is_own_profile = true;
+$target_id = $viewer_id;
+$target_type = $user_type;
+
+if (isset($_GET['id']) && $_GET['id'] != $viewer_id && ($user_type === 'admin' || $user_type === 'manager')) {
+    $target_id = intval($_GET['id']);
+    $target_type = 'employee';
+    $is_own_profile = false;
+}
 
 // Fetch data based on role
-if ($user_type === 'admin') {
+if ($target_type === 'admin') {
     $stmt = $conn->prepare("SELECT name, email, status, created_at FROM admins WHERE id = ?");
-    $stmt->bind_param("i", $viewer_id);
+    $stmt->bind_param("i", $target_id);
     $stmt->execute();
     $user_data = $stmt->get_result()->fetch_assoc();
-} elseif ($user_type === 'manager') {
+} elseif ($target_type === 'manager') {
     $stmt = $conn->prepare("SELECT name, email, department, phone, status, created_at FROM managers WHERE id = ?");
-    $stmt->bind_param("i", $viewer_id);
+    $stmt->bind_param("i", $target_id);
     $stmt->execute();
     $user_data = $stmt->get_result()->fetch_assoc();
 } else {
-    // For employees, we can redirect to employee_profile.php or just fetch data here
-    // Redirecting to the specialized employee profile page but highlighting it's "My Profile"
-    header("Location: employee_profile.php?id=" . $viewer_id);
-    exit();
+    // Employee
+    $stmt = $conn->prepare("SELECT CONCAT(first_name, ' ', COALESCE(last_name, '')) as name, email, department, phone, status, date_of_joining as created_at, job_title, employee_type as employment_type, employee_id as emp_code FROM employees WHERE id = ?");
+    $stmt->bind_param("i", $target_id);
+    $stmt->execute();
+    $user_data = $stmt->get_result()->fetch_assoc();
 }
 
 if (!$user_data) {
@@ -51,7 +61,7 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Profile - HRMS</title>
+    <title><?php echo $is_own_profile ? 'My Profile' : ucfirst($target_type) . ' Profile'; ?> - HRMS</title>
     <link rel="stylesheet" href="css/dashboard.css">
     <link rel="stylesheet" href="css/employees.css">
     <style>
@@ -135,7 +145,7 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
                         </svg>
                         <span class="nav-text">Dashboard</span>
                     </a>
-                    <a href="employees.php" class="nav-item <?php echo in_array($current_page, ['employees.php', 'add_employee.php', 'edit_employee.php', 'employee_profile.php']) ? 'active' : ''; ?>">
+                    <a href="employees.php" class="nav-item <?php echo in_array($current_page, ['employees.php', 'add_employee.php', 'edit_employee.php']) ? 'active' : ''; ?>">
                         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
                         </svg>
@@ -288,7 +298,7 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
                     <button class="mobile-menu-btn" onclick="toggleSidebar()">
                         <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
                     </button>
-                    <h1 class="page-title">My Profile</h1>
+                    <h1 class="page-title"><?php echo $is_own_profile ? 'My Profile' : ucfirst($target_type) . ' Profile'; ?></h1>
                 </div>
                 <div class="header-right">
                     <div class="user-menu">
@@ -311,13 +321,17 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
                         </div>
                         <div class="profile-info">
                             <h2><?php echo htmlspecialchars($user_data['name']); ?></h2>
-                            <p><?php echo ucfirst($user_type); ?> Account</p>
+                            <p><?php echo ucfirst($target_type); ?> Account</p>
                             <span class="status-badge status-<?php echo strtolower($user_data['status']); ?>">
                                 <?php echo $user_data['status']; ?>
                             </span>
                         </div>
                         <div style="margin-left: auto;">
+                            <?php if ($is_own_profile): ?>
                             <a href="settings.php" class="btn btn-secondary" style="text-decoration:none;">Update Settings</a>
+                            <?php elseif ($user_type === 'admin' && $target_type === 'employee'): ?>
+                            <a href="edit_employee.php?id=<?php echo $target_id; ?>" class="btn btn-secondary" style="text-decoration:none;">Edit Details</a>
+                            <?php endif; ?>
                         </div>
                     </div>
 
@@ -330,10 +344,31 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
                             <span class="info-label">Email Address</span>
                             <span class="info-value"><?php echo htmlspecialchars($user_data['email']); ?></span>
                         </div>
-                        <?php if ($user_type === 'manager'): ?>
+                        <?php if ($target_type === 'manager'): ?>
                         <div class="info-item">
                             <span class="info-label">Department</span>
                             <span class="info-value"><?php echo htmlspecialchars($user_data['department']); ?></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Phone</span>
+                            <span class="info-value"><?php echo htmlspecialchars($user_data['phone'] ?? 'Not set'); ?></span>
+                        </div>
+                        <?php elseif ($target_type === 'employee'): ?>
+                        <div class="info-item">
+                            <span class="info-label">Employee ID</span>
+                            <span class="info-value"><?php echo htmlspecialchars($user_data['emp_code'] ?? 'N/A'); ?></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Department</span>
+                            <span class="info-value"><?php echo htmlspecialchars($user_data['department'] ?? 'N/A'); ?></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Designation</span>
+                            <span class="info-value"><?php echo htmlspecialchars($user_data['job_title'] ?? 'N/A'); ?></span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Employment Type</span>
+                            <span class="info-value"><?php echo htmlspecialchars($user_data['employment_type'] ?? 'N/A'); ?></span>
                         </div>
                         <div class="info-item">
                             <span class="info-label">Phone</span>

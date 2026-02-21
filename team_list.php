@@ -83,7 +83,7 @@ $stmt->close();
                         </svg>
                         <span class="nav-text">Dashboard</span>
                     </a>
-                    <a href="employees.php" class="nav-item <?php echo in_array($current_page, ['employees.php', 'add_employee.php', 'edit_employee.php', 'employee_profile.php']) ? 'active' : ''; ?>">
+                    <a href="employees.php" class="nav-item <?php echo in_array($current_page, ['employees.php', 'add_employee.php', 'edit_employee.php']) ? 'active' : ''; ?>">
                         <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
                         </svg>
@@ -318,7 +318,7 @@ $stmt->close();
                                         </td>
                                         <td>
                                             <div class="action-buttons">
-                                                <a href="employee_profile.php?id=<?php echo $emp['id']; ?>" class="btn-icon" title="View Profile">
+                                                <a href="profile.php?id=<?php echo $emp['id']; ?>" class="btn-icon" title="View Profile">
                                                     <svg viewBox="0 0 20 20" fill="currentColor">
                                                         <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
                                                         <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
