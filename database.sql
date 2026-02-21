@@ -147,6 +147,7 @@ CREATE TABLE IF NOT EXISTS overtime_requests (
     status ENUM('pending', 'approved', 'rejected') DEFAULT 'pending',
     approved_by INT,
     approved_at TIMESTAMP NULL,
+    rejection_reason TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (employee_id) REFERENCES employees(id) ON DELETE CASCADE,
     FOREIGN KEY (approved_by) REFERENCES employees(id) ON DELETE SET NULL

@@ -1,278 +1,153 @@
 <?php
+/**
+ * Unified Settings Page
+ * Allows all users to update passwords and contact information
+ */
+
 session_start();
 require_once 'config.php';
-require_once 'includes/dropdown_helper.php';
 
-if (!isset($_SESSION['admin_id'])) {
+// Check login
+if (!isset($_SESSION['user_type'])) {
     header('Location: login.php');
     exit();
 }
 
-$id = $_GET['id'] ?? null;
-if (!$id) {
-    header('Location: managers.php');
-    exit();
-}
+$user_type = $_SESSION['user_type'];
+$viewer_id = $_SESSION[$user_type . '_id'];
+$viewer_name = $_SESSION[$user_type . '_name'];
 
 $success = '';
 $error = '';
-$new_password = '';
 
-// Fetch existing manager data
-$stmt = $conn->prepare("SELECT * FROM managers WHERE id = ?");
-$stmt->bind_param("i", $id);
-$stmt->execute();
-$result = $stmt->get_result();
-$manager = $result->fetch_assoc();
-$stmt->close();
+// Handle Password Change
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['change_password'])) {
+    $current_password = $_POST['current_password'];
+    $new_password = $_POST['new_password'];
+    $confirm_password = $_POST['confirm_password'];
 
-if (!$manager) {
-    header('Location: managers.php');
-    exit();
-}
-
-// Handle Form Submission
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (isset($_POST['update_manager'])) {
-        $name = $_POST['name'];
-        $email = $_POST['email'];
-        $department = $_POST['department'];
-        $phone = $_POST['phone'];
-        $status = $_POST['status'];
+    if ($new_password !== $confirm_password) {
+        $error = "New passwords do not match.";
+    } else {
+        // Fetch current hashed password
+        $table = ($user_type === 'admin') ? 'admins' : (($user_type === 'manager') ? 'managers' : 'employees');
+        $stmt = $conn->prepare("SELECT password FROM $table WHERE id = ?");
+        $stmt->bind_param("i", $viewer_id);
+        $stmt->execute();
+        $res = $stmt->get_result()->fetch_assoc();
         
-        $stmt = $conn->prepare("UPDATE managers SET name=?, email=?, department=?, phone=?, status=? WHERE id=?");
-        $stmt->bind_param("sssssi", $name, $email, $department, $phone, $status, $id);
-        
-        if ($stmt->execute()) {
-            $success = 'Manager updated successfully!';
-            // Refresh data
-            $manager['name'] = $name;
-            $manager['email'] = $email;
-            $manager['department'] = $department;
-            $manager['phone'] = $phone;
-            $manager['status'] = $status;
+        if (password_verify($current_password, $res['password'])) {
+            $hashed = password_hash($new_password, PASSWORD_DEFAULT);
+            $update = $conn->prepare("UPDATE $table SET password = ? WHERE id = ?");
+            $update->bind_param("si", $hashed, $viewer_id);
+            if ($update->execute()) {
+                $success = "Password updated successfully!";
+            } else {
+                $error = "Error updating password.";
+            }
         } else {
-            $error = 'Error updating manager: ' . $conn->error;
+            $error = "Current password is incorrect.";
         }
-        $stmt->close();
-    } elseif (isset($_POST['reset_password'])) {
-        $new_password = bin2hex(random_bytes(4)); // 8 character password
-        $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
-        
-        $stmt = $conn->prepare("UPDATE managers SET password=? WHERE id=?");
-        $stmt->bind_param("si", $hashed_password, $id);
-        
-        if ($stmt->execute()) {
-            $success = 'Password reset successfully!';
-        } else {
-            $error = 'Error resetting password: ' . $conn->error;
-            $new_password = '';
-        }
-        $stmt->close();
     }
 }
 
-$admin_name = $_SESSION['admin_name'];
-$user_type = $_SESSION['user_type'];
+// Handle Profile Update (Basic)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_profile'])) {
+    if ($user_type === 'manager') {
+        $name = trim($_POST['name']);
+        $phone = trim($_POST['phone']);
+        $stmt = $conn->prepare("UPDATE managers SET name = ?, phone = ? WHERE id = ?");
+        $stmt->bind_param("ssi", $name, $phone, $viewer_id);
+        if ($stmt->execute()) {
+            $_SESSION['manager_name'] = $name;
+            $success = "Profile updated successfully!";
+        } else {
+            $error = "Error updating profile.";
+        }
+    } elseif ($user_type === 'employee') {
+        $phone = trim($_POST['phone']);
+        $personal_email = trim($_POST['personal_email']);
+        $stmt = $conn->prepare("UPDATE employees SET phone = ?, personal_email = ? WHERE id = ?");
+        $stmt->bind_param("ssi", $phone, $personal_email, $viewer_id);
+        if ($stmt->execute()) {
+            $success = "Profile updated successfully!";
+        } else {
+            $error = "Error updating profile.";
+        }
+    }
+}
 
-// Get notification count
-$count_result = $conn->query("SELECT COUNT(*) as count FROM notifications WHERE status = 'active'");
-$notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
+// Fetch current data for fields
+if ($user_type === 'admin') {
+    $stmt = $conn->prepare("SELECT name, email FROM admins WHERE id = ?");
+    $stmt->bind_param("i", $viewer_id);
+    $stmt->execute();
+    $current_data = $stmt->get_result()->fetch_assoc();
+} elseif ($user_type === 'manager') {
+    $stmt = $conn->prepare("SELECT name, email, phone FROM managers WHERE id = ?");
+    $stmt->bind_param("i", $viewer_id);
+    $stmt->execute();
+    $current_data = $stmt->get_result()->fetch_assoc();
+} else {
+    $stmt = $conn->prepare("SELECT first_name, last_name, email, phone, personal_email FROM employees WHERE id = ?");
+    $stmt->bind_param("i", $viewer_id);
+    $stmt->execute();
+    $current_data = $stmt->get_result()->fetch_assoc();
+}
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Manager - HRMS</title>
+    <title>Account Settings - HRMS</title>
     <link rel="stylesheet" href="css/dashboard.css">
     <link rel="stylesheet" href="css/add_employee.css">
     <style>
-        .form-card {
+        .settings-container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .form-section {
             background: white;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            overflow: hidden;
-            animation: fadeInUp 0.5s ease-out;
-            margin-bottom: 32px;
-        }
-        
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .form-header {
-            background: linear-gradient(135deg, #0078D4 0%, #0053A0 100%);
-            padding: 32px;
-            color: white;
-        }
-        
-        .form-header-content {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-        
-        .form-icon {
-            width: 64px;
-            height: 64px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-        
-        .form-icon svg { width: 32px; height: 32px; }
-        .form-header h2 { font-size: 28px; font-weight: 700; margin: 0 0 4px 0; }
-        .form-header p { margin: 0; opacity: 0.9; font-size: 15px; }
-        
-        .manager-form { padding: 32px; }
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 24px;
-            margin-bottom: 32px;
-        }
-        
-        .form-group { display: flex; flex-direction: column; }
-        .form-label { font-size: 14px; font-weight: 600; color: #374151; margin-bottom: 8px; }
-        .required { color: #ef4444; }
-        
-        .input-wrapper { position: relative; }
-        .input-icon {
-            position: absolute;
-            left: 14px;
-            top: 50%;
-            transform: translateY(-50%);
-            width: 20px;
-            height: 20px;
-            color: #9ca3af;
-            pointer-events: none;
-        }
-        
-        .form-input, .form-select {
-            width: 100%;
-            padding: 12px 14px 12px 44px;
-            border: 2px solid #e5e7eb;
-            border-radius: 10px;
-            font-size: 15px;
-            color: #1a1a1a;
-            transition: all 0.3s ease;
-            background: white;
-        }
-        
-        .form-input:focus, .form-select:focus {
-            outline: none;
-            border-color: #0078D4;
-            box-shadow: 0 0 0 4px rgba(0, 120, 212, 0.1);
-        }
-
-        .btn-primary {
-            background: #0078D4;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 10px;
-            font-weight: 600;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-primary:hover { background: #0053A0; transform: translateY(-2px); }
-
-        .btn-secondary {
-            background: #f3f4f6;
-            color: #374151;
-            padding: 12px 24px;
-            border-radius: 10px;
-            font-weight: 600;
-            text-decoration: none;
-            border: 2px solid #e5e7eb;
-            transition: all 0.3s;
-        }
-
-        .btn-secondary:hover { background: #e5e7eb; }
-
-        .btn-danger {
-            background: #fee2e2;
-            color: #dc2626;
-            padding: 12px 24px;
-            border-radius: 10px;
-            font-weight: 600;
-            border: 2px solid #fecaca;
-            cursor: pointer;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .btn-danger:hover { background: #fecaca; }
-
-        .reset-password-section {
-            background: #f9fafb;
-            border: 2px solid #e5e7eb;
             border-radius: 12px;
             padding: 24px;
-            margin-top: 32px;
+            margin-bottom: 24px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
-
-        .reset-password-header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 16px;
-        }
-
-        .reset-password-title { font-weight: 700; color: #1a1a1a; margin: 0; }
-        
-        .password-display {
-            background: #ecfdf5;
-            border: 2px solid #10b981;
-            border-radius: 10px;
-            padding: 20px;
-            margin-top: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .password-code {
-            font-family: monospace;
-            font-size: 20px;
-            font-weight: 700;
-            color: #065f46;
-        }
-
-        .btn-copy {
-            background: #10b981;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 6px;
-            cursor: pointer;
+        .form-section-title {
+            font-size: 18px;
             font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #e5e7eb;
         }
-
-        .status-badge {
-            padding: 6px 12px;
-            border-radius: 9999px;
-            font-size: 12px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-        .status-active { background: #d1fae5; color: #065f46; }
-        .status-inactive { background: #fee2e2; color: #991b1b; }
     </style>
 </head>
 <body>
     <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="logo-container">
+                    <svg class="logo" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <rect width="64" height="64" rx="12" fill="url(#gradient)"/>
+                        <path d="M20 24h24M20 32h24M20 40h16" stroke="white" stroke-width="3" stroke-linecap="round"/>
+                        <defs>
+                            <linearGradient id="gradient" x1="0" y1="0" x2="64" y2="64">
+                                <stop offset="0%" stop-color="#0078D4"/><stop offset="100%" stop-color="#0053A0"/>
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+                <h1 class="sidebar-title">HRMS</h1>
+                <button class="sidebar-toggle" onclick="toggleSidebar()">
+                    <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
+                </button>
+            </div>
+            
             <?php $current_page = basename($_SERVER['PHP_SELF']); ?>
             <nav class="sidebar-nav">
                 <?php if ($user_type === 'admin'): ?>
@@ -424,156 +299,94 @@ $notification_count = $count_result ? $count_result->fetch_assoc()['count'] : 0;
                     </a>
                 <?php endif; ?>
             </nav>
-        
+            <div class="sidebar-footer">
+                <a href="logout.php" class="nav-item logout"><svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 00-1 1v12a1 1 0 102 0V4a1 1 0 00-1-1zm10.293 9.293a1 1 0 001.414 1.414l3-3a1 1 0 000-1.414l-3-3a1 1 0 10-1.414 1.414L14.586 9H7a1 1 0 100 2h7.586l-1.293 1.293z"/></svg><span class="nav-text">Logout</span></a>
+            </div>
+        </aside>
+
         <main class="main-content">
             <header class="top-header">
                 <div class="header-left">
-                    <h1 class="page-title">Edit Manager</h1>
-                </div>
-                <div class="header-right">
-                    <div class="user-menu">
-                        <button class="user-btn">
-                            <div class="user-avatar"><?php echo strtoupper(substr($admin_name, 0, 1)); ?></div>
-                            <div class="user-name"><?php echo htmlspecialchars($admin_name); ?></div>
-                        </button>
-                    </div>
+                    <button class="mobile-menu-btn" onclick="toggleSidebar()">
+                        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/></svg>
+                    </button>
+                    <h1 class="page-title">Account Settings</h1>
                 </div>
             </header>
-            
+
             <div class="content">
-                <?php if ($success): ?>
-                <div class="alert alert-success">
-                    <svg style="width:20px;height:20px" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/>
-                    </svg>
-                    <?php echo $success; ?>
-                </div>
-                <?php endif; ?>
-
-                <?php if ($error): ?>
-                <div class="alert alert-error">
-                    <svg style="width:20px;height:20px" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"/>
-                    </svg>
-                    <?php echo $error; ?>
-                </div>
-                <?php endif; ?>
-
-                <div class="form-card">
-                    <div class="form-header">
-                        <div class="form-header-content">
-                            <div class="form-icon">
-                                <svg viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z"/>
-                                </svg>
-                            </div>
-                            <div>
-                                <h2>Edit Manager Details</h2>
-                                <p>Update manager information and manage account status</p>
-                            </div>
+                <div class="settings-container">
+                    <?php if ($success): ?>
+                        <div class="alert alert-success" style="padding: 12px; background: #d1fae5; color: #065f46; border-radius: 8px; margin-bottom: 20px;">
+                            <?php echo $success; ?>
                         </div>
-                    </div>
-                    
-                    <form method="POST" class="manager-form">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label class="form-label">Full Name <span class="required">*</span></label>
-                                <div class="input-wrapper">
-                                    <svg class="input-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/></svg>
-                                    <input type="text" name="name" class="form-input" value="<?php echo htmlspecialchars($manager['name']); ?>" required>
-                                </div>
-                            </div>
-                            
-                            <div class="form-group">
-                                <label class="form-label">Email Address <span class="required">*</span></label>
-                                <div class="input-wrapper">
-                                    <svg class="input-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
-                                    <input type="email" name="email" class="form-input" value="<?php echo htmlspecialchars($manager['email']); ?>" required>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">Department <span class="required">*</span></label>
-                                <div class="input-wrapper">
-                                    <svg class="input-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a1 1 0 110 2h-3a1 1 0 01-1-1v-2a1 1 0 00-1-1H9a1 1 0 00-1 1v2a1 1 0 01-1 1H4a1 1 0 110-2V4zm3 1h2v2H7V5zm2 4H7v2h2V9zm2-4h2v2h-2V5zm2 4h-2v2h2V9z"/></svg>
-                                    <select name="department" class="form-select" required>
-                                        <?php echo renderDropdownOptions($conn, 'department', $manager['department']); ?>
-                                    </select>
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">Phone Number</label>
-                                <div class="input-wrapper">
-                                    <svg class="input-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 004.87 4.87l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>
-                                    <input type="tel" name="phone" class="form-input" value="<?php echo htmlspecialchars($manager['phone']); ?>">
-                                </div>
-                            </div>
-
-                            <div class="form-group">
-                                <label class="form-label">Account Status</label>
-                                <div class="input-wrapper">
-                                    <svg class="input-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"/></svg>
-                                    <select name="status" class="form-select" required>
-                                        <option value="active" <?php echo ($manager['status'] === 'active') ? 'selected' : ''; ?>>Active</option>
-                                        <option value="inactive" <?php echo ($manager['status'] === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
-                                    </select>
-                                </div>
-                            </div>
+                    <?php endif; ?>
+                    <?php if ($error): ?>
+                        <div class="alert alert-error" style="padding: 12px; background: #fee2e2; color: #991b1b; border-radius: 8px; margin-bottom: 20px;">
+                            <?php echo $error; ?>
                         </div>
+                    <?php endif; ?>
 
-                        <div style="display: flex; gap: 12px; justify-content: flex-end;">
-                            <a href="managers.php" class="btn-secondary">Cancel</a>
-                            <button type="submit" name="update_manager" class="btn-primary">Save Changes</button>
-                        </div>
-                    </form>
-
-                    <div class="reset-password-section">
-                        <div class="reset-password-header">
-                            <h3 class="reset-password-title">Security & Password</h3>
-                        </div>
-                        <p style="color: #6b7280; font-size: 14px; margin-bottom: 20px;">
-                            If the manager has forgotten their password, you can generate a new one here.
-                        </p>
-                        
-                        <form method="POST" onsubmit="return confirm('Generate a new random password for this manager?');">
-                            <button type="submit" name="reset_password" class="btn-danger">
-                                <svg viewBox="0 0 20 20" fill="currentColor" style="width:18px;height:18px">
-                                    <path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a3 3 0 106 0V4a2 2 0 00-2-2H4zm1 14a1 1 0 100-2 1 1 0 000 2zm5-1.757l4.9-4.9a2 2 0 000-2.828L13.485 5.1a2 2 0 00-2.828 0L10 5.757v8.486zM16 18H9.071l6-6H16a2 2 0 012 2v2a2 2 0 01-2 2z"/>
-                                </svg>
-                                Reset Password
-                            </button>
+                    <!-- Profile Information -->
+                    <?php if ($user_type === 'manager' || $user_type === 'employee'): ?>
+                    <section class="form-section">
+                        <h2 class="form-section-title">Profile Information</h2>
+                        <form method="POST">
+                            <input type="hidden" name="update_profile" value="1">
+                            <div class="form-grid">
+                                <?php if ($user_type === 'manager'): ?>
+                                <div class="form-group">
+                                    <label class="form-label">Full Name</label>
+                                    <input type="text" name="name" class="form-input" value="<?php echo htmlspecialchars($current_data['name']); ?>" required>
+                                </div>
+                                <?php endif; ?>
+                                <div class="form-group">
+                                    <label class="form-label">Phone Number</label>
+                                    <input type="text" name="phone" class="form-input" value="<?php echo htmlspecialchars($current_data['phone']); ?>">
+                                </div>
+                                <?php if ($user_type === 'employee'): ?>
+                                <div class="form-group">
+                                    <label class="form-label">Personal Email</label>
+                                    <input type="email" name="personal_email" class="form-input" value="<?php echo htmlspecialchars($current_data['personal_email']); ?>">
+                                </div>
+                                <?php endif; ?>
+                            </div>
+                            <div style="margin-top: 20px;">
+                                <button type="submit" class="btn btn-primary">Save Profile Changes</button>
+                            </div>
                         </form>
+                    </section>
+                    <?php endif; ?>
 
-                        <?php if ($new_password): ?>
-                        <div class="password-display">
-                            <div>
-                                <div style="font-size: 12px; color: #065f46; font-weight: 600; text-transform: uppercase;">New Password Generated</div>
-                                <div class="password-code" id="newPassword"><?php echo htmlspecialchars($new_password); ?></div>
+                    <!-- Password Change -->
+                    <section class="form-section">
+                        <h2 class="form-section-title">Change Password</h2>
+                        <form method="POST">
+                            <input type="hidden" name="change_password" value="1">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label class="form-label">Current Password</label>
+                                    <input type="password" name="current_password" class="form-input" required>
+                                </div>
+                                <div class="form-group"></div>
+                                <div class="form-group">
+                                    <label class="form-label">New Password</label>
+                                    <input type="password" name="new_password" class="form-input" required minlength="6">
+                                </div>
+                                <div class="form-group">
+                                    <label class="form-label">Confirm New Password</label>
+                                    <input type="password" name="confirm_password" class="form-input" required minlength="6">
+                                </div>
                             </div>
-                            <button class="btn-copy" onclick="copyPassword()">Copy Password</button>
-                        </div>
-                        <?php endif; ?>
-                    </div>
+                            <div style="margin-top: 20px;">
+                                <button type="submit" class="btn btn-primary">Update Password</button>
+                            </div>
+                        </form>
+                    </section>
                 </div>
             </div>
         </main>
     </div>
-
     <script src="js/dashboard.js"></script>
-    <script>
-        function copyPassword() {
-            const password = document.getElementById('newPassword').textContent;
-            navigator.clipboard.writeText(password).then(() => {
-                const btn = document.querySelector('.btn-copy');
-                btn.textContent = 'Copied!';
-                btn.style.background = '#059669';
-                setTimeout(() => {
-                    btn.textContent = 'Copy Password';
-                    btn.style.background = '#10b981';
-                }, 2000);
-            });
-        }
-    </script>
 </body>
 </html>

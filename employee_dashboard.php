@@ -89,17 +89,22 @@ if ($result) {
     }
 }
 
-// Get assigned projects count (when projects module is ready)
-$assigned_projects = 0;
+// Get assigned projects
+$active_projects_list = [];
 $projects_result = $conn->query("
-    SELECT COUNT(*) as count 
-    FROM project_assignments 
-    WHERE employee_id = $employee_id 
-    AND status = 'active'
+    SELECT p.*, pa.role as project_role, pa.allocation_percentage
+    FROM projects p
+    JOIN project_assignments pa ON p.id = pa.project_id
+    WHERE pa.employee_id = $employee_id 
+    AND pa.status = 'active'
+    ORDER BY p.start_date DESC
 ");
 if ($projects_result) {
-    $assigned_projects = $projects_result->fetch_assoc()['count'];
+    while ($row = $projects_result->fetch_assoc()) {
+        $active_projects_list[] = $row;
+    }
 }
+$assigned_projects = count($active_projects_list);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -294,42 +299,37 @@ if ($projects_result) {
                     </svg>
                 </button>
             </div>
+            <?php $current_page = basename($_SERVER['PHP_SELF']); ?>
             <nav class="sidebar-nav">
-                <a href="employee_dashboard.php" class="nav-item active">
+                <a href="employee_dashboard.php" class="nav-item <?php echo $current_page == 'employee_dashboard.php' ? 'active' : ''; ?>">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
                     </svg>
                     <span class="nav-text">Dashboard</span>
                 </a>
-                <a href="employee_profile.php" class="nav-item">
-                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>
-                    </svg>
+                <a href="profile.php" class="nav-item <?php echo $current_page == 'profile.php' ? 'active' : ''; ?>">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
                     <span class="nav-text">My Profile</span>
                 </a>
-                <a href="attendance.php" class="nav-item">
+                <a href="attendance.php" class="nav-item <?php echo $current_page == 'attendance.php' ? 'active' : ''; ?>">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/>
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
                     </svg>
                     <span class="nav-text">My Attendance</span>
                 </a>
-                <a href="employee_holidays.php" class="nav-item">
-                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/>
-                    </svg>
-                    <span class="nav-text">Holidays</span>
+                <a href="holidays.php" class="nav-item <?php echo $current_page == 'holidays.php' ? 'active' : ''; ?>">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
+                    <span class="nav-text">Holiday List</span>
                 </a>
-                <a href="leave_requests.php" class="nav-item">
+                <a href="leave_requests.php" class="nav-item <?php echo $current_page == 'leave_requests.php' ? 'active' : ''; ?>">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/>
                     </svg>
                     <span class="nav-text">Leave Requests</span>
                 </a>
-                <a href="#" class="nav-item">
-                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
-                    </svg>
-                    <span class="nav-text">My Projects</span>
+                <a href="settings.php" class="nav-item <?php echo $current_page == 'settings.php' ? 'active' : ''; ?>">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+                    <span class="nav-text">Account Settings</span>
                 </a>
             </nav>
             <div class="sidebar-footer">
@@ -365,8 +365,8 @@ if ($projects_result) {
                             </svg>
                         </button>
                         <div class="user-dropdown" id="userDropdown">
-                            <a href="#" class="dropdown-item">Profile</a>
-                            <a href="#" class="dropdown-item">Settings</a>
+                            <a href="profile.php" class="dropdown-item">Profile</a>
+                            <a href="settings.php" class="dropdown-item">Settings</a>
                             <a href="logout.php" class="dropdown-item">Logout</a>
                         </div>
                     </div>
@@ -511,11 +511,38 @@ if ($projects_result) {
                                         </span>
                                     </div>
                                 <?php endforeach; ?>
-                                <a href="employee_holidays.php" style="display: block; text-align: center; margin-top: 12px; color: #0078D4; text-decoration: none; font-size: 14px;">
+                                <a href="holidays.php" style="display: block; text-align: center; margin-top: 12px; color: #0078D4; text-decoration: none; font-size: 14px;">
                                     View All Holidays →
                                 </a>
                             <?php else: ?>
                                 <p style="text-align: center; color: #6b7280; padding: 20px;">No upcoming holidays</p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- My Active Projects Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3 class="card-title">My Active Projects</h3>
+                        </div>
+                        <div class="card-body">
+                            <?php if ($assigned_projects > 0): ?>
+                                <?php foreach ($active_projects_list as $proj): ?>
+                                    <div class="holiday-item" style="flex-direction: column; align-items: flex-start; gap: 4px;">
+                                        <div style="display: flex; justify-content: space-between; width: 100%;">
+                                            <div class="holiday-name" style="font-weight: 600;"><?php echo htmlspecialchars($proj['project_name']); ?></div>
+                                            <span class="attendance-status-badge <?php echo strtolower($proj['status']) == 'active' ? 'clocked-in' : 'completed'; ?>" style="font-size: 10px; padding: 2px 8px;">
+                                                <?php echo htmlspecialchars($proj['status']); ?>
+                                            </span>
+                                        </div>
+                                        <div style="font-size: 12px; color: #6b7280;">
+                                            Role: <strong><?php echo htmlspecialchars($proj['project_role']); ?></strong> 
+                                            <span style="margin-left:8px;">Allocation: <strong><?php echo $proj['allocation_percentage']; ?>%</strong></span>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php else: ?>
+                                <p style="text-align: center; color: #6b7280; padding: 20px;">No active projects assigned</p>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -553,7 +580,7 @@ if ($projects_result) {
                                 </div>
                                 <span class="quick-action-text">Request Leave</span>
                             </a>
-                            <a href="employee_profile.php" class="quick-action-btn">
+                            <a href="profile.php" class="quick-action-btn">
                                 <div class="quick-action-icon">
                                     <svg viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z"/>

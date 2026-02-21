@@ -43,6 +43,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $insert_stmt->bind_param("isssdi", $project_id, $expense_date, $expense_type, $description, $amount, $admin_id);
     
     if ($insert_stmt->execute()) {
+        // Increment utilized_amount in projects table
+        $update_stmt = $conn->prepare("UPDATE projects SET utilized_amount = utilized_amount + ? WHERE id = ?");
+        $update_stmt->bind_param("di", $amount, $project_id);
+        $update_stmt->execute();
+        $update_stmt->close();
+
         header("Location: project_details.php?id=$project_id&expense_added=1");
         exit();
     } else {

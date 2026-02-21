@@ -43,6 +43,48 @@ $ot_stmt->execute();
 $ot_count = $ot_stmt->get_result()->fetch_assoc()['count'];
 $ot_stmt->close();
 
+// Get Weekly Attendance Trend (Last 7 Days)
+$trend_data = [];
+$today_val = date('Y-m-d');
+$week_ago = date('Y-m-d', strtotime('-6 days'));
+$trend_stmt = $conn->prepare("
+    SELECT 
+        d.date,
+        COUNT(a.id) as present_count
+    FROM (
+        SELECT CURDATE() - INTERVAL (a.a) DAY AS date
+        FROM (SELECT 0 AS a UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4 UNION ALL SELECT 5 UNION ALL SELECT 6) AS a
+    ) d
+    LEFT JOIN attendance a ON d.date = a.date AND a.employee_id IN (
+        SELECT id FROM employees WHERE department = ? AND status = 'active'
+    )
+    GROUP BY d.date
+    ORDER BY d.date ASC
+");
+$trend_stmt->bind_param("s", $manager_department);
+$trend_stmt->execute();
+$trend_result = $trend_stmt->get_result();
+while ($row = $trend_result->fetch_assoc()) {
+    $trend_data[] = $row;
+}
+$trend_stmt->close();
+
+// Get Active Projects for Manager's Department
+$active_projects = [];
+$proj_stmt = $conn->prepare("
+    SELECT DISTINCT p.* 
+    FROM projects p
+    JOIN project_assignments pa ON p.id = pa.project_id
+    JOIN employees e ON pa.employee_id = e.id
+    WHERE (p.status = 'Active' OR p.status = 'Planning') 
+    AND e.department = ?
+    LIMIT 5
+");
+$proj_stmt->bind_param("s", $manager_department);
+$proj_stmt->execute();
+$active_projects = $proj_stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+$proj_stmt->close();
+
 // Get Today's Attendance Stats for Team
 $today = date('Y-m-d');
 $presence_stmt = $conn->prepare("
@@ -114,28 +156,58 @@ $activity_stmt->close();
                     </svg>
                 </button>
             </div>
+            <?php $current_page = basename($_SERVER['PHP_SELF']); ?>
             <nav class="sidebar-nav">
-                <a href="manager_dashboard.php" class="nav-item active">
+                <a href="manager_dashboard.php" class="nav-item <?php echo $current_page == 'manager_dashboard.php' ? 'active' : ''; ?>">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 011-1h2a1 1 0 011 1v2a1 1 0 001 1h2a1 1 0 001-1v-6.586l.293.293a1 1 0 001.414-1.414l-7-7z"/>
                     </svg>
                     <span class="nav-text">Dashboard</span>
                 </a>
-                <a href="team_list.php" class="nav-item">
+                <a href="team_list.php" class="nav-item <?php echo in_array($current_page, ['team_list.php']) ? 'active' : ''; ?>">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
                     </svg>
                     <span class="nav-text">Team Members</span>
                 </a>
-                <a href="holidays.php" class="nav-item"><svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg><span class="nav-text">Holidays</span></a>
-                <a href="leave_requests.php" class="nav-item"><svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg><span class="nav-text">Leave Requests</span></a>
-                <a href="team_attendance.php" class="nav-item">
+                <a href="holidays.php" class="nav-item <?php echo $current_page == 'holidays.php' ? 'active' : ''; ?>">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
+                    <span class="nav-text">Holidays</span>
+                </a>
+                <a href="leave_requests.php" class="nav-item <?php echo $current_page == 'leave_requests.php' ? 'active' : ''; ?>">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/></svg>
+                    <span class="nav-text">Leave Requests</span>
+                </a>
+                <a href="manage_leaves.php" class="nav-item <?php echo $current_page == 'manage_leaves.php' ? 'active' : ''; ?>">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clip-rule="evenodd"/>
+                    </svg>
+                    <span class="nav-text">Approve Leaves</span>
+                </a>
+                <a href="manage_overtime.php" class="nav-item <?php echo $current_page == 'manage_overtime.php' ? 'active' : ''; ?>">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
+                    </svg>
+                    <span class="nav-text">Approve OT</span>
+                </a>
+                <a href="team_attendance.php" class="nav-item <?php echo $current_page == 'team_attendance.php' ? 'active' : ''; ?>">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
                     </svg>
                     <span class="nav-text">Attendance</span>
                 </a>
-                <a href="projects.php" class="nav-item"><svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg><span class="nav-text">Projects</span></a>
+                <a href="projects.php" class="nav-item <?php echo in_array($current_page, ['projects.php', 'project_details.php']) ? 'active' : ''; ?>">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+                    <span class="nav-text">Projects</span>
+                </a>
+                <a href="profile.php" class="nav-item <?php echo $current_page == 'profile.php' ? 'active' : ''; ?>">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+                    <span class="nav-text">Profile</span>
+                </a>
+                <a href="settings.php" class="nav-item <?php echo $current_page == 'settings.php' ? 'active' : ''; ?>">
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+                    <span class="nav-text">Settings</span>
+                </a>
                 <a href="#" class="nav-item">
                     <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor">
                         <path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 0l-2 2a1 1 0 101.414 1.414L8 10.414l1.293 1.293a1 1 0 001.414 0l4-4z"/>
@@ -176,8 +248,8 @@ $activity_stmt->close();
                             </svg>
                         </button>
                         <div class="user-dropdown" id="userDropdown">
-                            <a href="#" class="dropdown-item">Profile</a>
-                            <a href="#" class="dropdown-item">Settings</a>
+                            <a href="profile.php" class="dropdown-item">Profile</a>
+                            <a href="settings.php" class="dropdown-item">Settings</a>
                             <a href="logout.php" class="dropdown-item">Logout</a>
                         </div>
                     </div>
@@ -191,7 +263,7 @@ $activity_stmt->close();
                 </div>
                 
                 <div class="stats-grid">
-                    <div class="stat-card">
+                    <a href="team_list.php" class="stat-card" style="text-decoration: none; color: inherit;">
                         <div class="stat-icon blue">
                             <svg viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
@@ -201,9 +273,9 @@ $activity_stmt->close();
                             <div class="stat-value"><?php echo $dept_employee_count; ?></div>
                             <div class="stat-label">Team Members</div>
                         </div>
-                    </div>
+                    </a>
 
-                    <div class="stat-card">
+                    <a href="team_attendance.php" class="stat-card" style="text-decoration: none; color: inherit;">
                         <div class="stat-icon green">
                             <svg viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M5 10a5 5 0 1110 0 5 5 0 01-10 0zm5-3a3 3 0 100 6 3 3 0 000-6z"/>
@@ -213,7 +285,7 @@ $activity_stmt->close();
                             <div class="stat-value"><?php echo $team_present; ?></div>
                             <div class="stat-label">Present Today</div>
                         </div>
-                    </div>
+                    </a>
 
                     <div class="stat-card">
                         <div class="stat-icon purple">
@@ -227,7 +299,7 @@ $activity_stmt->close();
                         </div>
                     </div>
                     
-                    <div class="stat-card">
+                    <a href="leave_requests.php" class="stat-card" style="text-decoration: none; color: inherit;">
                         <div class="stat-icon orange">
                             <svg viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/>
@@ -236,6 +308,43 @@ $activity_stmt->close();
                         <div class="stat-content">
                             <div class="stat-value"><?php echo $leave_count; ?></div>
                             <div class="stat-label">Pending Leaves</div>
+                        </div>
+                    </a>
+
+                    <a href="manage_overtime.php" class="stat-card" style="text-decoration: none; color: inherit;">
+                        <div class="stat-icon red">
+                            <svg viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
+                            </svg>
+                        </div>
+                        <div class="stat-content">
+                            <div class="stat-value"><?php echo $ot_count; ?></div>
+                            <div class="stat-label">Pending OT</div>
+                        </div>
+                    </a>
+                </div>
+
+                <div class="stats-grid" style="grid-template-columns: 1fr; margin-bottom: 24px;">
+                    <div class="card" style="padding: 20px;">
+                        <h3 class="card-title" style="margin-bottom: 16px;">Weekly Attendance Trend</h3>
+                        <div style="display: flex; align-items: flex-end; gap: 12px; height: 150px; padding-top: 20px;">
+                            <?php 
+                            $max_present = 0;
+                            foreach($trend_data as $day) if($day['present_count'] > $max_present) $max_present = $day['present_count'];
+                            if($max_present == 0) $max_present = 1;
+                            
+                            foreach($trend_data as $day): 
+                                $height = ($day['present_count'] / $max_present) * 100;
+                                $is_today_trend = ($day['date'] == $today_val);
+                            ?>
+                            <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px;">
+                                <div style="width: 100%; position: relative; height: 100px; background: #f3f4f6; border-radius: 4px; overflow: hidden;">
+                                    <div style="position: absolute; bottom: 0; width: 100%; height: <?php echo $height; ?>%; background: <?php echo $is_today_trend ? '#0078D4' : '#93c5fd'; ?>; transition: height 0.3s ease;"></div>
+                                </div>
+                                <div style="font-size: 10px; color: #6b7280;"><?php echo date('D', strtotime($day['date'])); ?></div>
+                                <div style="font-size: 11px; font-weight: 600;"><?php echo $day['present_count']; ?></div>
+                            </div>
+                            <?php endforeach; ?>
                         </div>
                     </div>
                 </div>
@@ -279,21 +388,61 @@ $activity_stmt->close();
 
                     <div class="card">
                         <div class="card-header">
+                            <h3 class="card-title">Active Projects</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="activity-list">
+                                <?php if (empty($active_projects)): ?>
+                                    <div class="no-data" style="padding: 20px; text-align: center; color: #666;">
+                                        No active projects assigned.
+                                    </div>
+                                <?php else: ?>
+                                    <?php foreach ($active_projects as $proj): ?>
+                                        <a href="project_details.php?id=<?php echo $proj['id']; ?>" class="activity-item" style="text-decoration: none; color: inherit; cursor: pointer;">
+                                            <div class="activity-icon blue">
+                                                <svg viewBox="0 0 20 20" fill="currentColor">
+                                                    <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
+                                                </svg>
+                                            </div>
+                                            <div class="activity-content">
+                                                <div class="activity-title" style="display:flex; justify-content:space-between;">
+                                                    <strong><?php echo htmlspecialchars($proj['project_name']); ?></strong>
+                                                    <span style="font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #e0f2fe; color: #0369a1;">
+                                                        <?php echo $proj['status']; ?>
+                                                    </span>
+                                                </div>
+                                                <div class="activity-time"><?php echo htmlspecialchars($proj['project_code']); ?></div>
+                                            </div>
+                                        </a>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
                             <h3 class="card-title">Quick Actions</h3>
                         </div>
                         <div class="card-body">
                             <div class="quick-actions">
-                                <a href="team_list.php" class="action-btn">
+                                <a href="manage_overtime.php" class="action-btn" style="position: relative;">
                                     <svg viewBox="0 0 20 20" fill="currentColor">
-                                        <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/>
+                                        <path d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"/>
                                     </svg>
-                                    View Team
+                                    Approve OT
+                                    <?php if ($ot_count > 0): ?>
+                                        <span style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white;"><?php echo $ot_count; ?></span>
+                                    <?php endif; ?>
                                 </a>
-                                <a href="manage_leaves.php" class="action-btn">
+                                <a href="manage_leaves.php" class="action-btn" style="position: relative;">
                                     <svg viewBox="0 0 20 20" fill="currentColor">
                                         <path fill-rule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z"/>
                                     </svg>
                                     Approve Leaves
+                                    <?php if ($leave_count > 0): ?>
+                                        <span style="position: absolute; top: -5px; right: -5px; background: #ef4444; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white;"><?php echo $leave_count; ?></span>
+                                    <?php endif; ?>
                                 </a>
                                 <a href="team_attendance.php" class="action-btn">
                                     <svg viewBox="0 0 20 20" fill="currentColor">
@@ -301,11 +450,14 @@ $activity_stmt->close();
                                     </svg>
                                     Team Attendance
                                 </a>
-                                <a href="projects.php" class="action-btn">
+                                <a href="projects.php" class="action-btn" style="position: relative;">
                                     <svg viewBox="0 0 20 20" fill="currentColor">
                                         <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/>
                                     </svg>
                                     Project Details
+                                    <?php if (count($active_projects) > 0): ?>
+                                        <span style="position: absolute; top: -5px; right: -5px; background: #0078D4; color: white; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; border: 2px solid white;"><?php echo count($active_projects); ?></span>
+                                    <?php endif; ?>
                                 </a>
                             </div>
                         </div>
