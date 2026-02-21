@@ -197,7 +197,7 @@ $activity_stmt->close();
                     <span class="nav-text">Attendance</span>
                 </a>
                 <a href="projects.php" class="nav-item <?php echo in_array($current_page, ['projects.php', 'project_details.php']) ? 'active' : ''; ?>">
-                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"/></svg>
+                    <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M11 17a1 1 0 001.447.894l2-1A1 1 0 0015 16V5a1 1 0 00-1.447-.894l-2 1A1 1 0 0011 6v11zM20 9v10l-6-3V6l6 3zM7 14.2l-6 3V7l6-3v10.2z"/></svg>
                     <span class="nav-text">Projects</span>
                 </a>
                 <a href="profile.php" class="nav-item <?php echo $current_page == 'profile.php' ? 'active' : ''; ?>">
