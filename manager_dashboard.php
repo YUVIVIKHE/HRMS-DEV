@@ -75,7 +75,7 @@ $activity_stmt = $conn->prepare("
      WHERE e.department = ? ORDER BY lr.created_at DESC LIMIT 5)
     ORDER BY time DESC LIMIT 8
 ");
-$activity_stmt->bind_param("ssss", $manager_department, $today, $manager_department);
+$activity_stmt->bind_param("sss", $manager_department, $today, $manager_department);
 $activity_stmt->execute();
 $activity_result = $activity_stmt->get_result();
 while($row = $activity_result->fetch_assoc()) {
